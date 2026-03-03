@@ -1,0 +1,438 @@
+"""
+Main game renderer.  Draws the entire frame each tick.
+
+Usage:
+    renderer = Renderer(screen)
+    renderer.setup_fonts()
+    # each frame:
+    renderer.draw(game)
+"""
+from __future__ import annotations
+import os
+import pygame
+
+from constants import (
+    WINDOW_WIDTH, WINDOW_HEIGHT, CARD_W, CARD_H,
+    TABLE_GREEN, TABLE_BORDER,
+    WHITE, BLACK_COLOR, LIGHT_GRAY, DARK_GRAY, GRAY, GOLD,
+    GREEN_COLOR, RED_COLOR,
+    FONT_LG, FONT_MD, FONT_SM, FONT_XSM,
+    BTN_W, BTN_H,
+    TENPAI_DOT_R,
+)
+from game.game_state import GameState
+from constants import CENTER_Y
+
+# States where all hands are revealed
+_REVEAL_STATES = frozenset({
+    GameState.WIN_TSUMO,
+    GameState.WIN_RON,
+    GameState.ROUND_END,
+    GameState.GAME_OVER,
+})
+
+# Side-player face-up layout constants
+_REVEAL_SIDE_STEP   = CARD_H // 2 + 2          # 52 – overlapping spread
+_REVEAL_SIDE_START_Y = CENTER_Y - (4 * _REVEAL_SIDE_STEP + CARD_H) // 2
+from gui.layout import (
+    HUMAN_CARD_X0, HUMAN_CARD_Y, HUMAN_CARD_GAP, HUMAN_CARD_LIFT,
+    HUMAN_LABEL_X, HUMAN_LABEL_Y,
+    AI2_CARD_X0, AI2_CARD_Y, AI2_CARD_GAP,
+    AI2_LABEL_X, AI2_LABEL_Y,
+    AI1_CARD_X, AI1_CARD_Y0, AI1_CARD_GAP,
+    AI1_LABEL_X, AI1_LABEL_Y,
+    AI3_CARD_X, AI3_CARD_Y0, AI3_CARD_GAP,
+    AI3_LABEL_X, AI3_LABEL_Y,
+    DECK_X, DECK_Y, DISCARD_X, DISCARD_Y,
+    BTN_DRAW_X, BTN_PICK_X, BTN_DISCARD_X, BTN_WIN_X, BTN_Y,
+    SCORE_X, SCORE_Y, SCORE_LINE_H,
+    LOG_X, LOG_Y, LOG_LINE_H,
+    RON_OVERLAY_RECT,
+)
+from gui.card_sprite import draw_card_face, draw_card_back, draw_ghost_face
+from gui.button import Button
+from gui.dialog import RonDialog, RoundEndDialog, GameOverDialog
+
+
+# ── Chinese font paths (direct file loading is more reliable than SysFont) ──
+_FONT_PATHS = [
+    'C:/Windows/Fonts/msjh.ttc',           # 微軟正黑體
+    'C:/Windows/Fonts/msyh.ttc',           # 微軟雅黑
+    'C:/Windows/Fonts/NotoSansTC-VF.ttf',  # Noto Sans TC
+    'C:/Windows/Fonts/kaiu.ttf',           # 標楷體
+    'C:/Windows/Fonts/mingliu.ttc',        # 細明體
+    'C:/Windows/Fonts/simsun.ttc',         # 宋體
+]
+
+_cached_font_path: str | None = None
+
+
+def _find_font_path() -> str | None:
+    global _cached_font_path
+    if _cached_font_path is not None:
+        return _cached_font_path
+    for path in _FONT_PATHS:
+        if os.path.exists(path):
+            _cached_font_path = path
+            return path
+    return None
+
+
+def _load_font(size: int) -> pygame.font.Font:
+    path = _find_font_path()
+    if path:
+        try:
+            return pygame.font.Font(path, size)
+        except Exception:
+            pass
+    return pygame.font.SysFont(None, size)
+
+
+class Renderer:
+    def __init__(self, screen: pygame.Surface) -> None:
+        self._screen = screen
+        self._fonts_ready = False
+
+        # Fonts
+        self.font_lg:  pygame.font.Font | None = None
+        self.font_md:  pygame.font.Font | None = None
+        self.font_sm:  pygame.font.Font | None = None
+        self.font_xsm: pygame.font.Font | None = None
+
+        # Buttons
+        self._btn_draw:    Button | None = None
+        self._btn_pick:    Button | None = None
+        self._btn_discard: Button | None = None
+        self._btn_win:     Button | None = None
+
+        # Dialogs
+        self._dlg_ron:       RonDialog | None = None
+        self._dlg_round_end: RoundEndDialog | None = None
+        self._dlg_game_over: GameOverDialog | None = None
+
+    # ------------------------------------------------------------------
+    # Initialisation
+    # ------------------------------------------------------------------
+
+    def setup_fonts(self) -> None:
+        self.font_lg  = _load_font(FONT_LG)
+        self.font_md  = _load_font(FONT_MD)
+        self.font_sm  = _load_font(FONT_SM)
+        self.font_xsm = _load_font(FONT_XSM)
+
+        self._btn_draw    = Button(BTN_DRAW_X,    BTN_Y, BTN_W, BTN_H, '摸牌', font=self.font_md)
+        self._btn_pick    = Button(BTN_PICK_X,    BTN_Y, BTN_W, BTN_H, '撿牌', font=self.font_md)
+        self._btn_discard = Button(BTN_DISCARD_X, BTN_Y, BTN_W, BTN_H, '棄牌', font=self.font_md)
+        self._btn_win     = Button(BTN_WIN_X,     BTN_Y, BTN_W, BTN_H, '胡牌', style='ron', font=self.font_md)
+
+        self._dlg_ron       = RonDialog(self.font_lg, self.font_md, self.font_sm)
+        self._dlg_round_end = RoundEndDialog(self.font_lg, self.font_md, self.font_sm)
+        self._dlg_game_over = GameOverDialog(self.font_lg, self.font_md)
+
+        self._fonts_ready = True
+
+    # ------------------------------------------------------------------
+    # Button state sync
+    # ------------------------------------------------------------------
+
+    def _sync_buttons(self, game) -> None:
+        self._btn_draw.enabled    = game.can_human_draw
+        self._btn_pick.enabled    = game.can_human_pick
+        self._btn_discard.enabled = game.can_human_discard
+        self._btn_win.enabled     = game.can_human_tsumo
+
+    # ------------------------------------------------------------------
+    # Main draw entry point
+    # ------------------------------------------------------------------
+
+    def draw(self, game) -> None:
+        if not self._fonts_ready:
+            return
+        self._sync_buttons(game)
+        surf = self._screen
+
+        # ── Table background ───────────────────────────────────────
+        surf.fill(TABLE_GREEN)
+        # Thin border
+        pygame.draw.rect(surf, TABLE_BORDER, (0, 0, WINDOW_WIDTH, WINDOW_HEIGHT), 4)
+
+        # ── Central play area border ───────────────────────────────
+        play_rect = pygame.Rect(180, 160, WINDOW_WIDTH - 360, WINDOW_HEIGHT - 320)
+        pygame.draw.rect(surf, (25, 80, 40), play_rect, border_radius=10)
+        pygame.draw.rect(surf, (40, 110, 60), play_rect, 2, border_radius=10)
+
+        # ── Deck ───────────────────────────────────────────────────
+        self._draw_deck(surf, game)
+
+        # ── Discard pile ───────────────────────────────────────────
+        self._draw_discard(surf, game)
+
+        # ── Players ────────────────────────────────────────────────
+        self._draw_human(surf, game)
+        self._draw_ai2(surf, game)    # top
+        self._draw_ai1(surf, game)    # right
+        self._draw_ai3(surf, game)    # left
+
+        # ── Scores (top-left) ──────────────────────────────────────
+        self._draw_scores(surf, game)
+
+        # ── Log (mid-left) ─────────────────────────────────────────
+        self._draw_log(surf, game)
+
+        # ── Buttons (bottom) ───────────────────────────────────────
+        if game.state not in (GameState.RON_WINDOW, GameState.ROUND_END, GameState.GAME_OVER):
+            for btn in (self._btn_draw, self._btn_pick, self._btn_discard, self._btn_win):
+                btn.draw(surf)
+
+        # ── Round label ────────────────────────────────────────────
+        rl = self.font_sm.render(f'第 {game.round_number} 局', True, LIGHT_GRAY)
+        surf.blit(rl, (WINDOW_WIDTH - rl.get_width() - 10, 8))
+
+        # ── Overlay dialogs ────────────────────────────────────────
+        if game.state == GameState.RON_WINDOW and game.human_can_ron:
+            card_str = str(game.last_discard) if game.last_discard else '?'
+            self._dlg_ron.draw(surf, card_str, game.ron_window_ms)
+
+        elif game.state == GameState.ROUND_END:
+            scores = [(p.name, p.score) for p in game.players]
+            bankrupt = [p.name for p in game.players if p.is_bankrupt()]
+            winner_name = game.winner.name if game.winner else None
+            self._dlg_round_end.draw(surf, winner_name, game.win_type, scores, bankrupt)
+
+        elif game.state == GameState.GAME_OVER:
+            scores = [(p.name, p.score) for p in game.players]
+            self._dlg_game_over.draw(surf, scores)
+
+    # ------------------------------------------------------------------
+    # Sub-drawers
+    # ------------------------------------------------------------------
+
+    def _draw_deck(self, surf: pygame.Surface, game) -> None:
+        draw_card_back(surf, DECK_X, DECK_Y)
+        # Stack effect
+        if game.deck.remaining > 1:
+            draw_card_back(surf, DECK_X - 2, DECK_Y - 2)
+        if game.deck.remaining > 5:
+            draw_card_back(surf, DECK_X - 4, DECK_Y - 4)
+        # Count
+        cnt = self.font_sm.render(str(game.deck.remaining), True, WHITE)
+        surf.blit(cnt, (DECK_X + (CARD_W - cnt.get_width()) // 2, DECK_Y + CARD_H + 4))
+        lbl = self.font_xsm.render('牌庫', True, LIGHT_GRAY)
+        surf.blit(lbl, (DECK_X + (CARD_W - lbl.get_width()) // 2, DECK_Y + CARD_H + 4 + cnt.get_height()))
+
+    def _draw_discard(self, surf: pygame.Surface, game) -> None:
+        lbl = self.font_xsm.render('棄牌堆', True, LIGHT_GRAY)
+        surf.blit(lbl, (DISCARD_X + (CARD_W - lbl.get_width()) // 2, DISCARD_Y - lbl.get_height() - 2))
+
+        top = game.last_discard
+        if top:
+            draw_card_face(surf, top, DISCARD_X, DISCARD_Y,
+                           font_md=self.font_md, font_sm=self.font_sm)
+        else:
+            # Empty discard slot
+            pygame.draw.rect(surf, (20, 70, 30),
+                             (DISCARD_X, DISCARD_Y, CARD_W, CARD_H), border_radius=6)
+            pygame.draw.rect(surf, DARK_GRAY,
+                             (DISCARD_X, DISCARD_Y, CARD_W, CARD_H), 1, border_radius=6)
+
+        cnt = self.font_xsm.render(f'共{game.deck.discard_count}張', True, GRAY)
+        surf.blit(cnt, (DISCARD_X, DISCARD_Y + CARD_H + 4))
+
+    def _draw_human(self, surf: pygame.Surface, game) -> None:
+        human  = game.human
+        cards  = human.hand.cards
+        is_turn = game.is_human_turn
+
+        # Player label + tenpai indicator
+        self._draw_player_label(
+            surf, human.name, HUMAN_LABEL_X, HUMAN_LABEL_Y,
+            tenpai=human.in_tenpai, is_turn=is_turn, anchor='left',
+        )
+
+        # Cards
+        for i, card in enumerate(cards):
+            selected = (i == human.selected_index)
+            x = HUMAN_CARD_X0 + i * HUMAN_CARD_GAP
+            y = HUMAN_CARD_Y - (HUMAN_CARD_LIFT if selected else 0)
+            draw_card_face(surf, card, x, y,
+                           selected=selected,
+                           font_md=self.font_md,
+                           font_sm=self.font_sm)
+
+        # "你的回合" indicator
+        if is_turn and game.state in (GameState.DRAWING, GameState.PLAYER_DRAWN):
+            ind = self.font_sm.render('▲ 你的回合', True, GOLD)
+            surf.blit(ind, (HUMAN_CARD_X0, HUMAN_CARD_Y - 22))
+
+    def _draw_ai2(self, surf: pygame.Surface, game) -> None:
+        """Top player."""
+        ai      = game.players[2]
+        reveal  = game.state in _REVEAL_STATES
+
+        for i, card in enumerate(ai.hand):
+            x = AI2_CARD_X0 + i * AI2_CARD_GAP
+            if reveal:
+                draw_card_face(surf, card, x, AI2_CARD_Y,
+                               font_md=self.font_md, font_sm=self.font_sm)
+            else:
+                draw_card_back(surf, x, AI2_CARD_Y)
+
+        is_turn = (game.current_player_index == 2)
+        self._draw_player_label(
+            surf, ai.name, AI2_LABEL_X, AI2_LABEL_Y,
+            tenpai=ai.in_tenpai, is_turn=is_turn, anchor='center',
+        )
+
+    def _draw_ai1(self, surf: pygame.Surface, game) -> None:
+        """Right player – rotated back / upright face-up on reveal."""
+        ai     = game.players[1]
+        reveal = game.state in _REVEAL_STATES
+
+        for i, card in enumerate(ai.hand):
+            if reveal:
+                x = WINDOW_WIDTH - CARD_W - 20
+                y = _REVEAL_SIDE_START_Y + i * _REVEAL_SIDE_STEP
+                draw_card_face(surf, card, x, y,
+                               font_md=self.font_md, font_sm=self.font_sm)
+            else:
+                draw_card_back(surf, AI1_CARD_X, AI1_CARD_Y0 + i * AI1_CARD_GAP,
+                               rotated=True)
+
+        is_turn = (game.current_player_index == 1)
+        self._draw_player_label(
+            surf, ai.name, AI1_LABEL_X, AI1_LABEL_Y,
+            tenpai=ai.in_tenpai, is_turn=is_turn, anchor='right',
+        )
+
+    def _draw_ai3(self, surf: pygame.Surface, game) -> None:
+        """Left player – rotated back / upright face-up on reveal."""
+        ai     = game.players[3]
+        reveal = game.state in _REVEAL_STATES
+
+        for i, card in enumerate(ai.hand):
+            if reveal:
+                x = 20
+                y = _REVEAL_SIDE_START_Y + i * _REVEAL_SIDE_STEP
+                draw_card_face(surf, card, x, y,
+                               font_md=self.font_md, font_sm=self.font_sm)
+            else:
+                draw_card_back(surf, AI3_CARD_X, AI3_CARD_Y0 + i * AI3_CARD_GAP,
+                               rotated=True)
+
+        is_turn = (game.current_player_index == 3)
+        self._draw_player_label(
+            surf, ai.name, AI3_LABEL_X, AI3_LABEL_Y,
+            tenpai=ai.in_tenpai, is_turn=is_turn, anchor='left',
+        )
+
+    def _draw_player_label(
+        self,
+        surf: pygame.Surface,
+        name: str,
+        x: int, y: int,
+        *,
+        tenpai: bool,
+        is_turn: bool,
+        anchor: str = 'left',
+    ) -> None:
+        color = GOLD if is_turn else WHITE
+        txt   = self.font_sm.render(name, True, color)
+        if anchor == 'center':
+            x -= txt.get_width() // 2
+        elif anchor == 'right':
+            x -= txt.get_width()
+        surf.blit(txt, (x, y))
+
+        # Tenpai dot
+        if tenpai:
+            dot_x = x + txt.get_width() + TENPAI_DOT_R + 3
+            dot_y = y + txt.get_height() // 2
+            pygame.draw.circle(surf, GREEN_COLOR, (dot_x, dot_y), TENPAI_DOT_R)
+            tl = self.font_xsm.render('聽', True, WHITE)
+            surf.blit(tl, (dot_x - tl.get_width() // 2, dot_y - tl.get_height() // 2))
+
+    def _draw_scores(self, surf: pygame.Surface, game) -> None:
+        header = self.font_sm.render('分數', True, GOLD)
+        surf.blit(header, (SCORE_X, SCORE_Y))
+        y = SCORE_Y + SCORE_LINE_H
+        for p in game.players:
+            col = WHITE if p.score > 0 else RED_COLOR
+            line = self.font_xsm.render(f'{p.name}: {p.score}', True, col)
+            surf.blit(line, (SCORE_X, y))
+            y += SCORE_LINE_H
+
+    def _draw_log(self, surf: pygame.Surface, game) -> None:
+        y = LOG_Y
+        for msg in game.log[:6]:
+            lbl = self.font_xsm.render(msg, True, LIGHT_GRAY)
+            surf.blit(lbl, (LOG_X, y))
+            y += LOG_LINE_H
+
+    # ------------------------------------------------------------------
+    # Event forwarding helpers (called by main.py)
+    # ------------------------------------------------------------------
+
+    def handle_event_for_game(self, event: pygame.event.Event, game) -> None:
+        """Translate button clicks and card clicks into game actions."""
+        state = game.state
+
+        # ── RON window ────────────────────────────────────────────
+        if state == GameState.RON_WINDOW and game.human_can_ron:
+            action = self._dlg_ron.handle_event(event)
+            if action == 'ron':
+                game.human_declare_ron()
+            elif action == 'pass':
+                game.human_pass_ron()
+            return
+
+        # ── Round end ─────────────────────────────────────────────
+        if state == GameState.ROUND_END:
+            action = self._dlg_round_end.handle_event(event)
+            if action == 'next':
+                game.human_next_round()
+            elif action == 'quit':
+                game.human_quit()
+            return
+
+        # ── Game over ─────────────────────────────────────────────
+        if state == GameState.GAME_OVER:
+            if self._dlg_game_over.handle_event(event):
+                import sys; sys.exit(0)
+            return
+
+        # ── Human action buttons ──────────────────────────────────
+        if self._btn_draw.handle_event(event):
+            game.human_draw()
+            return
+
+        if self._btn_pick.handle_event(event):
+            game.human_pick_discard()
+            return
+
+        if self._btn_discard.handle_event(event):
+            idx = game.human.selected_index
+            if idx >= 0:
+                game.human_discard(idx)
+            return
+
+        if self._btn_win.handle_event(event):
+            game.human_declare_tsumo()
+            return
+
+        # ── Card click (human hand) ────────────────────────────────
+        if (event.type == pygame.MOUSEBUTTONDOWN and event.button == 1
+                and state == GameState.PLAYER_DRAWN
+                and game.is_human_turn):
+            self._handle_card_click(event.pos, game)
+
+    def _handle_card_click(self, pos: tuple, game) -> None:
+        human = game.human
+        cards = human.hand.cards
+        for i in range(len(cards)):
+            x = HUMAN_CARD_X0 + i * HUMAN_CARD_GAP
+            selected = (i == human.selected_index)
+            y = HUMAN_CARD_Y - (HUMAN_CARD_LIFT if selected else 0)
+            rect = pygame.Rect(x, y, CARD_W, CARD_H)
+            if rect.collidepoint(pos):
+                human.select_card(i)
+                return
