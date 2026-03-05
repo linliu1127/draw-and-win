@@ -71,16 +71,16 @@ AI1_CARD_X   = WINDOW_WIDTH - CARD_H - 20   # left edge of rotated card
 AI1_CARD_Y0  = CENTER_Y - (5 * (CARD_W + 8)) // 2
 AI1_CARD_GAP = CARD_W + 8
 
-AI1_LABEL_X  = WINDOW_WIDTH - 10
-AI1_LABEL_Y  = CENTER_Y
+AI1_LABEL_X  = AI1_CARD_X + CARD_H // 2              # horizontal centre of card column
+AI1_LABEL_Y  = AI1_CARD_Y0 + 4 * AI1_CARD_GAP + CARD_W + 8  # below last card
 
 # --- AI 3  (left side, cards rotated 90°) ---
 AI3_CARD_X   = 20                            # left edge of rotated card
 AI3_CARD_Y0  = CENTER_Y - (5 * (CARD_W + 8)) // 2
 AI3_CARD_GAP = CARD_W + 8
 
-AI3_LABEL_X  = 10
-AI3_LABEL_Y  = CENTER_Y
+AI3_LABEL_X  = AI3_CARD_X + CARD_H // 2
+AI3_LABEL_Y  = AI3_CARD_Y0 + 4 * AI3_CARD_GAP + CARD_W + 8
 
 # ------------------------------------------------------------------
 # Info panel  (right side, below AI1 cards)
@@ -93,9 +93,9 @@ SCORE_X = 20
 SCORE_Y = 20
 SCORE_LINE_H = 22
 
-# Log panel  (bottom-centre-left)
+# Log panel  (bottom-left, beside human cards)
 LOG_X = 20
-LOG_Y = WINDOW_HEIGHT // 2
+LOG_Y = WINDOW_HEIGHT - CARD_H - 30   # same top-y as human cards; human cards start at x≈409
 LOG_LINE_H = 18
 
 # RON window overlay (semi-transparent)

@@ -53,11 +53,17 @@ class Hand:
     # Sorting
     # ------------------------------------------------------------------
 
+    @staticmethod
+    def _sort_key(c: Card) -> tuple:
+        """Black (♠♣) asc → red (♥♦) asc → ghost last."""
+        if c.is_ghost:
+            return (2, 0)
+        return (0 if c.color == Color.BLACK else 1, c.rank)
+
+    def sort(self) -> None:
+        """Sort cards in place."""
+        self._cards.sort(key=self._sort_key)
+
     def sorted_cards(self) -> list[Card]:
-        """Ghost first, then black (♠♣) by rank, then red (♥♦) by rank."""
-        def _key(c: Card):
-            if c.is_ghost:
-                return (0, 0, 0)
-            color_order = 0 if c.color == Color.BLACK else 1
-            return (1, color_order, c.rank)
-        return sorted(self._cards, key=_key)
+        """Return a sorted copy: black asc, red asc, ghost last."""
+        return sorted(self._cards, key=self._sort_key)

@@ -9,6 +9,7 @@ Usage:
 """
 from __future__ import annotations
 import os
+import re
 import pygame
 
 from constants import (
@@ -49,7 +50,17 @@ from gui.layout import (
     LOG_X, LOG_Y, LOG_LINE_H,
     RON_OVERLAY_RECT,
 )
-from gui.card_sprite import draw_card_face, draw_card_back, draw_ghost_face
+from gui.card_sprite import draw_card_face, draw_card_back, draw_ghost_face, _suit as _draw_suit
+from core.card import Suit as _Suit
+# Log suit-symbol rendering helpers
+_LOG_SUIT_RE  = re.compile('([♠♣♥♦])')
+_LOG_SUIT_MAP = {
+    '♠': (_Suit.SPADES,   BLACK_COLOR),
+    '♣': (_Suit.CLUBS,    BLACK_COLOR),
+    '♥': (_Suit.HEARTS,   RED_COLOR),
+    '♦': (_Suit.DIAMONDS, RED_COLOR),
+}
+
 from gui.button import Button
 from gui.dialog import RonDialog, RoundEndDialog, GameOverDialog
 
@@ -301,7 +312,7 @@ class Renderer:
         is_turn = (game.current_player_index == 1)
         self._draw_player_label(
             surf, ai.name, AI1_LABEL_X, AI1_LABEL_Y,
-            tenpai=ai.in_tenpai, is_turn=is_turn, anchor='right',
+            tenpai=ai.in_tenpai, is_turn=is_turn, anchor='center',
         )
 
     def _draw_ai3(self, surf: pygame.Surface, game) -> None:
@@ -322,7 +333,7 @@ class Renderer:
         is_turn = (game.current_player_index == 3)
         self._draw_player_label(
             surf, ai.name, AI3_LABEL_X, AI3_LABEL_Y,
-            tenpai=ai.in_tenpai, is_turn=is_turn, anchor='left',
+            tenpai=ai.in_tenpai, is_turn=is_turn, anchor='center',
         )
 
     def _draw_player_label(
@@ -343,14 +354,6 @@ class Renderer:
             x -= txt.get_width()
         surf.blit(txt, (x, y))
 
-        # Tenpai dot
-        if tenpai:
-            dot_x = x + txt.get_width() + TENPAI_DOT_R + 3
-            dot_y = y + txt.get_height() // 2
-            pygame.draw.circle(surf, GREEN_COLOR, (dot_x, dot_y), TENPAI_DOT_R)
-            tl = self.font_xsm.render('聽', True, WHITE)
-            surf.blit(tl, (dot_x - tl.get_width() // 2, dot_y - tl.get_height() // 2))
-
     def _draw_scores(self, surf: pygame.Surface, game) -> None:
         header = self.font_sm.render('分數', True, GOLD)
         surf.blit(header, (SCORE_X, SCORE_Y))
@@ -363,10 +366,26 @@ class Renderer:
 
     def _draw_log(self, surf: pygame.Surface, game) -> None:
         y = LOG_Y
-        for msg in game.log[:6]:
-            lbl = self.font_xsm.render(msg, True, LIGHT_GRAY)
-            surf.blit(lbl, (LOG_X, y))
+        for msg in game.log[:5]:
+            self._draw_log_line(surf, msg, LOG_X, y)
             y += LOG_LINE_H
+
+    def _draw_log_line(self, surf: pygame.Surface, text: str, x: int, y: int) -> None:
+        """Render one log line; suit symbols (♠♣♥♦) are drawn as small graphics."""
+        fh = self.font_xsm.get_height()
+        cx = x
+        for token in _LOG_SUIT_RE.split(text):
+            if not token:
+                continue
+            if token in _LOG_SUIT_MAP:
+                suit_enum, col = _LOG_SUIT_MAP[token]
+                sz = 4
+                _draw_suit(surf, suit_enum, cx + sz + 1, y + fh // 2, sz, col)
+                cx += sz * 2 + 4
+            else:
+                t = self.font_xsm.render(token, True, LIGHT_GRAY)
+                surf.blit(t, (cx, y))
+                cx += t.get_width()
 
     # ------------------------------------------------------------------
     # Event forwarding helpers (called by main.py)

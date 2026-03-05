@@ -22,6 +22,7 @@ class Player:
 
     def draw_card(self, card: Card) -> None:
         self.hand.add(card)
+        self.hand.sort()
         self._update_tenpai()
 
     def discard_card(self, card: Card) -> Card:

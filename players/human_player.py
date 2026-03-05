@@ -28,3 +28,7 @@ class HumanPlayer(Player):
 
     def clear_selection(self) -> None:
         self.selected_index = -1
+
+    def draw_card(self, card) -> None:
+        super().draw_card(card)
+        self.selected_index = -1   # hand re-sorted; old index no longer valid
