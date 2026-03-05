@@ -45,7 +45,7 @@ from gui.layout import (
     AI3_CARD_X, AI3_CARD_Y0, AI3_CARD_GAP,
     AI3_LABEL_X, AI3_LABEL_Y,
     DECK_X, DECK_Y, DISCARD_X, DISCARD_Y,
-    BTN_DRAW_X, BTN_PICK_X, BTN_DISCARD_X, BTN_WIN_X, BTN_Y,
+    BTN_WIN_X, BTN_Y,
     SCORE_X, SCORE_Y, SCORE_LINE_H,
     LOG_X, LOG_Y, LOG_LINE_H,
     RON_OVERLAY_RECT,
@@ -111,10 +111,11 @@ class Renderer:
         self.font_xsm: pygame.font.Font | None = None
 
         # Buttons
-        self._btn_draw:    Button | None = None
-        self._btn_pick:    Button | None = None
-        self._btn_discard: Button | None = None
-        self._btn_win:     Button | None = None
+        self._btn_win: Button | None = None
+
+        # Double-click tracking
+        self._last_click_ms:     int = 0
+        self._last_click_target: str = ''
 
         # Dialogs
         self._dlg_ron:       RonDialog | None = None
@@ -131,10 +132,7 @@ class Renderer:
         self.font_sm  = _load_font(FONT_SM)
         self.font_xsm = _load_font(FONT_XSM)
 
-        self._btn_draw    = Button(BTN_DRAW_X,    BTN_Y, BTN_W, BTN_H, '摸牌', font=self.font_md)
-        self._btn_pick    = Button(BTN_PICK_X,    BTN_Y, BTN_W, BTN_H, '撿牌', font=self.font_md)
-        self._btn_discard = Button(BTN_DISCARD_X, BTN_Y, BTN_W, BTN_H, '棄牌', font=self.font_md)
-        self._btn_win     = Button(BTN_WIN_X,     BTN_Y, BTN_W, BTN_H, '胡牌', style='ron', font=self.font_md)
+        self._btn_win = Button(BTN_WIN_X, BTN_Y, BTN_W, BTN_H, '胡牌', style='ron', font=self.font_md)
 
         self._dlg_ron       = RonDialog(self.font_lg, self.font_md, self.font_sm)
         self._dlg_round_end = RoundEndDialog(self.font_lg, self.font_md, self.font_sm)
@@ -147,10 +145,7 @@ class Renderer:
     # ------------------------------------------------------------------
 
     def _sync_buttons(self, game) -> None:
-        self._btn_draw.enabled    = game.can_human_draw
-        self._btn_pick.enabled    = game.can_human_pick
-        self._btn_discard.enabled = game.can_human_discard
-        self._btn_win.enabled     = game.can_human_tsumo
+        self._btn_win.enabled = game.can_human_tsumo
 
     # ------------------------------------------------------------------
     # Main draw entry point
@@ -192,8 +187,7 @@ class Renderer:
 
         # ── Buttons (bottom) ───────────────────────────────────────
         if game.state not in (GameState.RON_WINDOW, GameState.ROUND_END, GameState.GAME_OVER):
-            for btn in (self._btn_draw, self._btn_pick, self._btn_discard, self._btn_win):
-                btn.draw(surf)
+            self._btn_win.draw(surf)
 
         # ── Round label ────────────────────────────────────────────
         rl = self.font_sm.render(f'第 {game.round_number} 局', True, LIGHT_GRAY)
@@ -202,7 +196,8 @@ class Renderer:
         # ── Overlay dialogs ────────────────────────────────────────
         if game.state == GameState.RON_WINDOW and game.human_can_ron:
             card_str = str(game.last_discard) if game.last_discard else '?'
-            self._dlg_ron.draw(surf, card_str, game.ron_window_ms)
+            claimant_names = [game.players[i].name for i in game.ron_claimants]
+            self._dlg_ron.draw(surf, card_str, game.ron_window_ms, claimant_names)
 
         elif game.state == GameState.ROUND_END:
             scores = [(p.name, p.score) for p in game.players]
@@ -218,6 +213,19 @@ class Renderer:
     # Sub-drawers
     # ------------------------------------------------------------------
 
+    def _is_pending(self, target: str) -> bool:
+        """Return True if *target* was first-clicked and still within the double-click window."""
+        return (
+            self._last_click_target == target
+            and (pygame.time.get_ticks() - self._last_click_ms) <= 400
+        )
+
+    def _draw_highlight(self, surf: pygame.Surface, x: int, y: int) -> None:
+        """Draw a gold glow border around a card-sized area."""
+        pad = 4
+        rect = pygame.Rect(x - pad, y - pad, CARD_W + pad * 2, CARD_H + pad * 2)
+        pygame.draw.rect(surf, GOLD, rect, 3, border_radius=9)
+
     def _draw_deck(self, surf: pygame.Surface, game) -> None:
         draw_card_back(surf, DECK_X, DECK_Y)
         # Stack effect
@@ -225,6 +233,9 @@ class Renderer:
             draw_card_back(surf, DECK_X - 2, DECK_Y - 2)
         if game.deck.remaining > 5:
             draw_card_back(surf, DECK_X - 4, DECK_Y - 4)
+        # Highlight on first click
+        if self._is_pending('deck'):
+            self._draw_highlight(surf, DECK_X, DECK_Y)
         # Count
         cnt = self.font_sm.render(str(game.deck.remaining), True, WHITE)
         surf.blit(cnt, (DECK_X + (CARD_W - cnt.get_width()) // 2, DECK_Y + CARD_H + 4))
@@ -245,6 +256,10 @@ class Renderer:
                              (DISCARD_X, DISCARD_Y, CARD_W, CARD_H), border_radius=6)
             pygame.draw.rect(surf, DARK_GRAY,
                              (DISCARD_X, DISCARD_Y, CARD_W, CARD_H), 1, border_radius=6)
+
+        # Highlight on first click
+        if self._is_pending('discard'):
+            self._draw_highlight(surf, DISCARD_X, DISCARD_Y)
 
         cnt = self.font_xsm.render(f'共{game.deck.discard_count}張', True, GRAY)
         surf.blit(cnt, (DISCARD_X, DISCARD_Y + CARD_H + 4))
@@ -419,39 +434,49 @@ class Renderer:
                 import sys; sys.exit(0)
             return
 
-        # ── Human action buttons ──────────────────────────────────
-        if self._btn_draw.handle_event(event):
-            game.human_draw()
-            return
-
-        if self._btn_pick.handle_event(event):
-            game.human_pick_discard()
-            return
-
-        if self._btn_discard.handle_event(event):
-            idx = game.human.selected_index
-            if idx >= 0:
-                game.human_discard(idx)
-            return
-
+        # ── 胡牌 button ───────────────────────────────────────────
         if self._btn_win.handle_event(event):
             game.human_declare_tsumo()
             return
 
-        # ── Card click (human hand) ────────────────────────────────
-        if (event.type == pygame.MOUSEBUTTONDOWN and event.button == 1
-                and state == GameState.PLAYER_DRAWN
-                and game.is_human_turn):
-            self._handle_card_click(event.pos, game)
+        # ── Double-click interactions ──────────────────────────────
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            now    = pygame.time.get_ticks()
+            target = self._get_click_target(event.pos, game)
 
-    def _handle_card_click(self, pos: tuple, game) -> None:
-        human = game.human
-        cards = human.hand.cards
-        for i in range(len(cards)):
-            x = HUMAN_CARD_X0 + i * HUMAN_CARD_GAP
-            selected = (i == human.selected_index)
-            y = HUMAN_CARD_Y - (HUMAN_CARD_LIFT if selected else 0)
-            rect = pygame.Rect(x, y, CARD_W, CARD_H)
-            if rect.collidepoint(pos):
-                human.select_card(i)
-                return
+            if target and target == self._last_click_target and (now - self._last_click_ms) <= 400:
+                # ── Second click: execute action ───────────────────
+                self._last_click_target = ''
+                self._last_click_ms     = 0
+                if target == 'deck' and game.can_human_draw:
+                    game.human_draw()
+                elif target == 'discard' and game.can_human_pick:
+                    game.human_pick_discard()
+                elif target.startswith('card_') and game.can_human_discard:
+                    game.human_discard(int(target[5:]))
+            else:
+                # ── First click: record; select card if applicable ─
+                self._last_click_target = target or ''
+                self._last_click_ms     = now
+                if (target and target.startswith('card_')
+                        and state == GameState.PLAYER_DRAWN
+                        and game.is_human_turn):
+                    game.human.select_card(int(target[5:]))
+
+    def _get_click_target(self, pos: tuple, game) -> str | None:
+        """Return a stable string identifier for whatever was clicked, or None."""
+        # Deck
+        if pygame.Rect(DECK_X, DECK_Y, CARD_W, CARD_H).collidepoint(pos):
+            return 'deck'
+        # Discard pile
+        if pygame.Rect(DISCARD_X, DISCARD_Y, CARD_W, CARD_H).collidepoint(pos):
+            return 'discard'
+        # Human hand cards (use a taller hit-rect covering both lifted/non-lifted)
+        if game.is_human_turn:
+            for i in range(len(game.human.hand.cards)):
+                x    = HUMAN_CARD_X0 + i * HUMAN_CARD_GAP
+                y_hi = HUMAN_CARD_Y - HUMAN_CARD_LIFT      # top when fully lifted
+                rect = pygame.Rect(x, y_hi, CARD_W, CARD_H + HUMAN_CARD_LIFT)
+                if rect.collidepoint(pos):
+                    return f'card_{i}'
+        return None

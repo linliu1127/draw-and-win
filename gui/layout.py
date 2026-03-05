@@ -37,11 +37,8 @@ HUMAN_LABEL_Y = WINDOW_HEIGHT - 28
 BTN_Y = WINDOW_HEIGHT - BTN_H - 10
 BTN_GAP = BTN_W + 8
 
-# Four action buttons: 摸牌 撿牌 棄牌 胡牌
-BTN_DRAW_X    = CENTER_X + 220
-BTN_PICK_X    = BTN_DRAW_X    + BTN_GAP
-BTN_DISCARD_X = BTN_PICK_X    + BTN_GAP
-BTN_WIN_X     = BTN_DISCARD_X + BTN_GAP
+# 胡牌 button
+BTN_WIN_X = CENTER_X + 220 + 3 * BTN_GAP
 
 # RON / pass buttons (shown in RON_WINDOW state, centred)
 BTN_RON_X    = CENTER_X - BTN_W - 20

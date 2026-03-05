@@ -61,10 +61,15 @@ class Game:
         self.human_can_ron:   bool = False
         self.ron_window_ms:   int  = 0   # countdown
         self._ai_ron_queue:   list[int] = []   # AI seat indices that want RON
+        self.ron_claimants:   list[int] = []   # ALL claimants in priority order
 
         # AI action timer
         self._ai_timer_ms: int = 0
         self._ai_phase:    str = ''   # 'draw' | 'discard' | 'ron_check'
+
+        # Whether the current drawn card came from the discard pile
+        # (撿牌 → must discard, cannot tsumo)
+        self._drew_from_discard: bool = False
 
         # Log messages (newest first, max 8)
         self.log: list[str] = []
@@ -125,6 +130,7 @@ class Game:
             return False
         human = self.players[SEAT_HUMAN]
         human.draw_card(card)
+        self._drew_from_discard = False
         self._log(f'{human.name} 摸牌')
         self._set_state(GameState.PLAYER_DRAWN)
         return True
@@ -141,6 +147,7 @@ class Game:
         self.last_discard_player = None
         human = self.players[SEAT_HUMAN]
         human.draw_card(card)
+        self._drew_from_discard = True
         self._log(f'{human.name} 撿牌 {card}')
         self._set_state(GameState.PLAYER_DRAWN)
         return True
@@ -158,8 +165,10 @@ class Game:
         return True
 
     def human_declare_tsumo(self) -> bool:
-        """Human declares tsumo win.  Valid in PLAYER_DRAWN state."""
+        """Human declares tsumo win.  Valid in PLAYER_DRAWN state, deck draw only."""
         if self.state != GameState.PLAYER_DRAWN or self.current_player_index != SEAT_HUMAN:
+            return False
+        if self._drew_from_discard:
             return False
         human = self.players[SEAT_HUMAN]
         if not check_win(human.hand.cards):
@@ -230,6 +239,8 @@ class Game:
         self._ai_timer_ms        = 0
         self._ai_phase           = ''
         self._ai_ron_queue       = []
+        self.ron_claimants       = []
+        self._drew_from_discard  = False
 
         for p in self.players:
             p.clear_hand()
@@ -252,7 +263,10 @@ class Game:
     def _update_drawing(self, dt: int) -> None:
         cp = self.current_player_index
         if cp == SEAT_HUMAN:
-            return   # Wait for human_draw() / human_pick_discard()
+            # Safety: no valid action available → flow round
+            if self.deck.is_empty() and self.last_discard is None:
+                self._end_draw_round()
+            return   # Otherwise wait for human_draw() / human_pick_discard()
 
         # AI turn
         if self._ai_phase != 'draw':
@@ -273,6 +287,7 @@ class Game:
             self.last_discard        = None
             self.last_discard_player = None
             ai.draw_card(discard_top)
+            self._drew_from_discard = True
             self._log(f'{ai.name} 撿牌 {discard_top}')
             picked = True
 
@@ -282,6 +297,7 @@ class Game:
                 self._end_draw_round()
                 return
             ai.draw_card(card)
+            self._drew_from_discard = False
             self._log(f'{ai.name} 摸牌')
 
         self._ai_phase = ''
@@ -307,8 +323,8 @@ class Game:
         if self._ai_timer_ms > 0:
             return
 
-        # Tsumo?
-        if check_win(ai.hand.cards):
+        # Tsumo? (only valid when drawn from deck, not from discard pile)
+        if not self._drew_from_discard and check_win(ai.hand.cards):
             self.winner   = ai
             self.win_type = 'tsumo'
             self._log(f'{ai.name} 自摸！')
@@ -348,30 +364,44 @@ class Game:
             self._advance_turn()
             return
 
-        # Collect AI players who want to RON (in turn order after discarder)
+        # Build priority-ordered claimant list (closest seat after discarder first)
         discarder_idx = self.players.index(self.last_discard_player)
         order = [(discarder_idx + i) % NUM_PLAYERS for i in range(1, NUM_PLAYERS)]
 
-        self._ai_ron_queue = []
+        self.ron_claimants = []
         for idx in order:
+            p = self.players[idx]
             if idx == SEAT_HUMAN:
-                continue
-            p: AIPlayer = self.players[idx]  # type: ignore
-            if p.can_win_with(card) and p.should_declare_ron(card):
-                self._ai_ron_queue.append(idx)
+                if p.can_win_with(card):
+                    self.ron_claimants.append(idx)
+            else:
+                ai: AIPlayer = p  # type: ignore
+                if ai.can_win_with(card) and ai.should_declare_ron(card):
+                    self.ron_claimants.append(idx)
 
-        # Check human
-        human = self.players[SEAT_HUMAN]
-        if human.can_win_with(card):
+        if not self.ron_claimants:
+            self._advance_turn()
+            return
+
+        # Log when multiple players can Ron
+        if len(self.ron_claimants) > 1:
+            names = '、'.join(self.players[i].name for i in self.ron_claimants)
+            winner_name = self.players[self.ron_claimants[0]].name
+            self._log(f'複數胡牌：{names} → {winner_name} 獲勝（順位最近）')
+
+        # AI queue: all AI claimants in priority order (winner is [0])
+        self._ai_ron_queue = [i for i in self.ron_claimants if i != SEAT_HUMAN]
+
+        # Show RON_WINDOW only when human is the highest-priority claimant
+        if SEAT_HUMAN in self.ron_claimants and self.ron_claimants[0] == SEAT_HUMAN:
             self.human_can_ron = True
             self.ron_window_ms = RON_WINDOW_TIME
             self._ai_timer_ms  = AI_RON_DELAY
             self._ai_phase     = 'ron_check'
             self._set_state(GameState.RON_WINDOW)
-            return
-
-        # No human RON → check AIs
-        self._check_ai_ron()
+        else:
+            # Human not the priority winner → resolve directly
+            self._check_ai_ron()
 
     # ------------------------------------------------------------------
     # RON_WINDOW
@@ -430,7 +460,7 @@ class Game:
         self.winner       = None
         self.win_type     = 'draw'
         self.is_draw_round = True
-        self._log('牌庫抽完，本局流局')
+        self._log('無人胡牌，流局')
         self._set_state(GameState.ROUND_END)
 
     # ------------------------------------------------------------------
@@ -441,8 +471,12 @@ class Game:
         self.current_player_index = (
             (self.current_player_index + 1) % NUM_PLAYERS
         )
-        self._ai_phase    = ''
-        self._ai_timer_ms = 0
+        self._ai_phase           = ''
+        self._ai_timer_ms        = 0
+        self._drew_from_discard  = False
+        if self.deck.is_empty():
+            self._end_draw_round()
+            return
         self._set_state(GameState.DRAWING)
 
     # ------------------------------------------------------------------
@@ -498,5 +532,6 @@ class Game:
         return (
             self.state == GameState.PLAYER_DRAWN
             and self.is_human_turn
+            and not self._drew_from_discard
             and check_win(self.human.hand.cards)
         )

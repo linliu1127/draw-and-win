@@ -39,7 +39,7 @@ class RonDialog:
 
         cx = 600
         cy = 400
-        w, h = 440, 150
+        w, h = 440, 178
         px = cx - w // 2
         py = cy - h // 2
 
@@ -54,6 +54,7 @@ class RonDialog:
         surface: pygame.Surface,
         discard_card_str: str,
         countdown_ms: int,
+        claimant_names: list[str] | None = None,
     ) -> None:
         _panel(surface, self.rect)
 
@@ -65,13 +66,21 @@ class RonDialog:
         # Card info
         card_txt = self._font_md.render(f'對方棄牌：{discard_card_str}', True, WHITE)
         cx2 = self.rect.x + (self.rect.w - card_txt.get_width()) // 2
-        surface.blit(card_txt, (cx2, self.rect.y + 46))
+        surface.blit(card_txt, (cx2, self.rect.y + 44))
+
+        # Multi-Ron notice (shown when multiple claimants exist)
+        if claimant_names and len(claimant_names) > 1:
+            others = '、'.join(claimant_names[1:])
+            notice_str = f'競爭：{others} 也胡牌，但你順位最近'
+            notice = self._font_sm.render(notice_str, True, (255, 160, 60))
+            nx = self.rect.x + (self.rect.w - notice.get_width()) // 2
+            surface.blit(notice, (nx, self.rect.y + 70))
 
         # Countdown bar
         secs = max(0, countdown_ms / 1000)
         bar_w = self.rect.w - 30
         bar_x = self.rect.x + 15
-        bar_y = self.rect.y + 76
+        bar_y = self.rect.y + 96
         pygame.draw.rect(surface, DARK_GRAY, (bar_x, bar_y, bar_w, 10), border_radius=5)
         fill = int(bar_w * secs / 5)
         col  = (80, 200, 80) if secs > 2 else (200, 100, 30)
@@ -122,7 +131,7 @@ class RoundEndDialog:
 
         # Title
         if win_type == 'draw':
-            title_str = '本局流局'
+            title_str = '流局'
             title_col = (180, 180, 80)
         elif winner_name:
             verb = '自摸！' if win_type == 'tsumo' else '胡牌！'

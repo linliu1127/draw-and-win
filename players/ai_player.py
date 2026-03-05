@@ -1,10 +1,15 @@
 from __future__ import annotations
+import random
 from collections import Counter
 
 from players.player import Player
 from core.card import Card
 from core.tenpai_checker import get_winning_cards, can_win_with
 from core.win_checker import check_win
+
+# Probability of declaring Ron depending on how many ghosts (魃) are in hand.
+# More ghosts → better tsumo potential → less incentive to Ron.
+_RON_PROB_BY_GHOSTS = {0: 1.0, 1: 0.30, 2: 0.10}
 
 
 class AIPlayer(Player):
@@ -35,8 +40,12 @@ class AIPlayer(Player):
         return new_score > current_score
 
     def should_declare_ron(self, card: Card) -> bool:
-        """Always RON if the card completes the hand."""
-        return self.can_win_with(card)
+        """RON if the card completes the hand, but ghost holders prefer to wait for tsumo."""
+        if not self.can_win_with(card):
+            return False
+        ghost_count = sum(1 for c in self.hand.cards if c.is_ghost)
+        prob = _RON_PROB_BY_GHOSTS.get(ghost_count, 0.10)
+        return random.random() < prob
 
     def should_declare_tsumo(self) -> bool:
         """Always declare tsumo when possible."""
