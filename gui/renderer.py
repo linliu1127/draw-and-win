@@ -13,7 +13,7 @@ import re
 import pygame
 
 from constants import (
-    WINDOW_WIDTH, WINDOW_HEIGHT, CARD_W, CARD_H,
+    WINDOW_WIDTH, WINDOW_HEIGHT, CARD_W, CARD_H, SEAT_HUMAN,
     TABLE_GREEN, TABLE_BORDER,
     WHITE, BLACK_COLOR, LIGHT_GRAY, DARK_GRAY, GRAY, GOLD,
     GREEN_COLOR, RED_COLOR,
@@ -44,7 +44,7 @@ from gui.layout import (
     AI1_LABEL_X, AI1_LABEL_Y,
     AI3_CARD_X, AI3_CARD_Y0, AI3_CARD_GAP,
     AI3_LABEL_X, AI3_LABEL_Y,
-    DECK_X, DECK_Y, DISCARD_X, DISCARD_Y,
+    DECK_X, DECK_Y, DISCARD_ROWS,
     BTN_WIN_X, BTN_Y,
     SCORE_X, SCORE_Y, SCORE_LINE_H,
     LOG_X, LOG_Y, LOG_LINE_H,
@@ -117,6 +117,11 @@ class Renderer:
         self._last_click_ms:     int = 0
         self._last_click_target: str = ''
 
+        # Invalid-pick feedback (red border + message, auto-expires)
+        self._invalid_pick_msg:    str             = ''
+        self._invalid_pick_pos:    tuple[int, int] = (0, 0)
+        self._invalid_pick_end_ms: int             = 0
+
         # Dialogs
         self._dlg_ron:       RonDialog | None = None
         self._dlg_round_end: RoundEndDialog | None = None
@@ -170,8 +175,19 @@ class Renderer:
         # ── Deck ───────────────────────────────────────────────────
         self._draw_deck(surf, game)
 
-        # ── Discard pile ───────────────────────────────────────────
-        self._draw_discard(surf, game)
+        # ── Per-player discard history ─────────────────────────────
+        self._draw_discard_history(surf, game)
+
+        # ── Invalid-pick feedback ───────────────────────────────────
+        if self._invalid_pick_msg:
+            if pygame.time.get_ticks() < self._invalid_pick_end_ms:
+                ix, iy = self._invalid_pick_pos
+                pygame.draw.rect(surf, (220, 60, 60),
+                                 (ix - 2, iy - 2, CARD_W + 4, CARD_H + 4), 3, border_radius=8)
+                err = self.font_sm.render(self._invalid_pick_msg, True, (220, 60, 60))
+                surf.blit(err, (ix + (CARD_W - err.get_width()) // 2, iy - err.get_height() - 4))
+            else:
+                self._invalid_pick_msg = ''
 
         # ── Players ────────────────────────────────────────────────
         self._draw_human(surf, game)
@@ -242,27 +258,33 @@ class Renderer:
         lbl = self.font_xsm.render('牌庫', True, LIGHT_GRAY)
         surf.blit(lbl, (DECK_X + (CARD_W - lbl.get_width()) // 2, DECK_Y + CARD_H + 4 + cnt.get_height()))
 
-    def _draw_discard(self, surf: pygame.Surface, game) -> None:
-        lbl = self.font_xsm.render('棄牌堆', True, LIGHT_GRAY)
-        surf.blit(lbl, (DISCARD_X + (CARD_W - lbl.get_width()) // 2, DISCARD_Y - lbl.get_height() - 2))
+    def _draw_discard_history(self, surf: pygame.Surface, game) -> None:
+        """Draw each player's full discard history in front of their position.
+        Only 上家's most-recent card is eligible for pickup (gold highlight).
+        """
+        upjia = (SEAT_HUMAN + 3) % 4          # seat 3 for human
+        now   = pygame.time.get_ticks()
 
-        top = game.last_discard
-        if top:
-            draw_card_face(surf, top, DISCARD_X, DISCARD_Y,
-                           font_md=self.font_md, font_sm=self.font_sm)
-        else:
-            # Empty discard slot
-            pygame.draw.rect(surf, (20, 70, 30),
-                             (DISCARD_X, DISCARD_Y, CARD_W, CARD_H), border_radius=6)
-            pygame.draw.rect(surf, DARK_GRAY,
-                             (DISCARD_X, DISCARD_Y, CARD_W, CARD_H), 1, border_radius=6)
+        for seat, (sx, sy, sdx, sdy, max_v) in DISCARD_ROWS.items():
+            cards     = game.discard_history[seat]
+            n         = len(cards)
+            start_idx = max(0, n - max_v)
 
-        # Highlight on first click
-        if self._is_pending('discard'):
-            self._draw_highlight(surf, DISCARD_X, DISCARD_Y)
+            for disp_i, card_i in enumerate(range(start_idx, n)):
+                card = cards[card_i]
+                x = sx + disp_i * sdx
+                y = sy + disp_i * sdy
+                draw_card_face(surf, card, x, y,
+                               font_md=self.font_md, font_sm=self.font_sm)
 
-        cnt = self.font_xsm.render(f'共{game.deck.discard_count}張', True, GRAY)
-        surf.blit(cnt, (DISCARD_X, DISCARD_Y + CARD_H + 4))
+                # Gold highlight: valid pickup card (last from 上家, human's turn)
+                is_valid = (seat == upjia and card_i == n - 1 and game.can_human_pick)
+                # First-click pending highlight
+                target_key = f'discard_{seat}_{card_i}'
+                is_pending = (self._last_click_target == target_key
+                              and (now - self._last_click_ms) <= 400)
+                if is_valid or is_pending:
+                    self._draw_highlight(surf, x, y)
 
     def _draw_human(self, surf: pygame.Surface, game) -> None:
         human  = game.human
@@ -450,8 +472,28 @@ class Renderer:
                 self._last_click_ms     = 0
                 if target == 'deck' and game.can_human_draw:
                     game.human_draw()
-                elif target == 'discard' and game.can_human_pick:
-                    game.human_pick_discard()
+                elif (target and target.startswith('discard_')
+                      and game.state == GameState.DRAWING and game.is_human_turn):
+                    _, seat_s, idx_s = target.split('_')
+                    seat, card_idx   = int(seat_s), int(idx_s)
+                    upjia            = (SEAT_HUMAN + 3) % 4
+                    history          = game.discard_history[seat]
+                    # Compute screen position for this card (for error overlay)
+                    sx, sy, sdx, sdy, max_v = DISCARD_ROWS[seat]
+                    n         = len(history)
+                    start_idx = max(0, n - max_v)
+                    disp_i    = card_idx - start_idx
+                    cx, cy    = sx + disp_i * sdx, sy + disp_i * sdy
+                    if game.can_human_pick and seat == upjia and card_idx == n - 1:
+                        game.human_pick_discard()
+                    elif seat != upjia:
+                        self._invalid_pick_msg    = '你不能撿上家以外的牌'
+                        self._invalid_pick_pos    = (cx, cy)
+                        self._invalid_pick_end_ms = pygame.time.get_ticks() + 1800
+                    else:
+                        self._invalid_pick_msg    = '你不能撿前一輪的牌'
+                        self._invalid_pick_pos    = (cx, cy)
+                        self._invalid_pick_end_ms = pygame.time.get_ticks() + 1800
                 elif target.startswith('card_') and game.can_human_discard:
                     game.human_discard(int(target[5:]))
             else:
@@ -468,9 +510,16 @@ class Renderer:
         # Deck
         if pygame.Rect(DECK_X, DECK_Y, CARD_W, CARD_H).collidepoint(pos):
             return 'deck'
-        # Discard pile
-        if pygame.Rect(DISCARD_X, DISCARD_Y, CARD_W, CARD_H).collidepoint(pos):
-            return 'discard'
+        # Discard history cards (all seats)
+        for seat, (sx, sy, sdx, sdy, max_v) in DISCARD_ROWS.items():
+            cards     = game.discard_history[seat]
+            n         = len(cards)
+            start_idx = max(0, n - max_v)
+            for disp_i, card_i in enumerate(range(start_idx, n)):
+                x = sx + disp_i * sdx
+                y = sy + disp_i * sdy
+                if pygame.Rect(x, y, CARD_W, CARD_H).collidepoint(pos):
+                    return f'discard_{seat}_{card_i}'
         # Human hand cards (use a taller hit-rect covering both lifted/non-lifted)
         if game.is_human_turn:
             for i in range(len(game.human.hand.cards)):

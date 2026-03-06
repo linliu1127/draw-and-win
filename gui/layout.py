@@ -12,12 +12,23 @@ from constants import (
     BTN_W, BTN_H, CENTER_X, CENTER_Y,
 )
 
-# Deck and discard pile positions (top-left corner of the card rect)
-DECK_X    = CENTER_X + 20
-DECK_Y    = CENTER_Y - CARD_H // 2
+# Deck position – centred on the table
+DECK_X = CENTER_X - CARD_W // 2
+DECK_Y = CENTER_Y - CARD_H // 2
 
-DISCARD_X = CENTER_X - CARD_W - 20
-DISCARD_Y = CENTER_Y - CARD_H // 2
+# Per-seat discard history layout: (start_x, start_y, step_x, step_y, max_visible)
+# Cards are laid left-to-right (horizontal) or top-to-bottom (vertical)
+# in front of each player, between their hand and the centre of the table.
+#   Seat 0 (Human, bottom)  → horizontal row above the hand
+#   Seat 1 (AI Right)       → vertical column to the left of their cards
+#   Seat 2 (AI Top)         → horizontal row below their cards
+#   Seat 3 (AI Left)        → vertical column to the right of their cards
+DISCARD_ROWS = {
+    0: (200,  535, CARD_W + 5, 0,          8),
+    1: (890,  190, 0,          CARD_H + 5, 4),
+    2: (200,  165, CARD_W + 5, 0,          8),
+    3: (215,  190, 0,          CARD_H + 5, 4),
+}
 
 # ------------------------------------------------------------------
 # Human player  (bottom, cards shown face-up)

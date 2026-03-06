@@ -40,8 +40,19 @@ class AIPlayer(Player):
         return new_score > current_score
 
     def should_declare_ron(self, card: Card) -> bool:
-        """RON if the card completes the hand, but ghost holders prefer to wait for tsumo."""
+        """RON if the card completes the hand, but:
+        - 釣寶 hands (any same-color card wins) → only 5% chance to ron;
+          almost always worth waiting for tsumo (300pts vs 50pts).
+        - If picking up this card would create 釣寶, decline ron entirely.
+        - Otherwise, ghost holders prefer tsumo over ron.
+        """
         if not self.can_win_with(card):
+            return False
+        # Already in 釣寶: extremely broad winning condition → rarely ron
+        if self._is_diaobao(self.hand.cards):
+            return random.random() < 0.05
+        # Not yet 釣寶 but picking up this card would enable it: decline ron
+        if self._can_become_diaobao(self.hand.cards + [card]):
             return False
         ghost_count = sum(1 for c in self.hand.cards if c.is_ghost)
         prob = _RON_PROB_BY_GHOSTS.get(ghost_count, 0.10)
@@ -70,6 +81,37 @@ class AIPlayer(Player):
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
+
+    def _is_diaobao(self, hand4: list[Card]) -> bool:
+        """釣寶: wins with any card of a single color.
+
+        Two forms:
+        - 1 ghost + 3 same-color consecutive regular cards
+        - 2 ghosts + 2 same-color regular cards with rank gap ≤ 2
+          (gap ≤ 2 guarantees a ghost can fill the sequence and pair any draw)
+        """
+        ghosts  = [c for c in hand4 if c.is_ghost]
+        regular = [c for c in hand4 if not c.is_ghost]
+
+        if len({c.color for c in regular}) != 1:
+            return False
+
+        if len(ghosts) == 1 and len(regular) == 3:
+            ranks = sorted(c.rank for c in regular)
+            return ranks[1] == ranks[0] + 1 and ranks[2] == ranks[1] + 1
+
+        if len(ghosts) == 2 and len(regular) == 2:
+            ranks = sorted(c.rank for c in regular)
+            return ranks[1] - ranks[0] <= 2
+
+        return False
+
+    def _can_become_diaobao(self, five_cards: list[Card]) -> bool:
+        """Return True if discarding one card from five_cards leaves a 釣寶 hand."""
+        for card in five_cards:
+            if self._is_diaobao([c for c in five_cards if c is not card]):
+                return True
+        return False
 
     def _best_discard_from(self, five_cards: list[Card]) -> Card | None:
         best_card  = None

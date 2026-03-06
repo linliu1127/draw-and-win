@@ -56,6 +56,8 @@ class Game:
         # Discard tracking
         self.last_discard:        Card   | None = None
         self.last_discard_player: Player | None = None
+        # Full per-player discard history (face-up, shown in front of each player)
+        self.discard_history: list[list[Card]] = [[] for _ in range(NUM_PLAYERS)]
 
         # RON window
         self.human_can_ron:   bool = False
@@ -136,13 +138,14 @@ class Game:
         return True
 
     def human_pick_discard(self) -> bool:
-        """Human picks the top discard.  Valid only in DRAWING state, human's turn."""
+        """Human picks 上家's discard.  Valid only in DRAWING state, human's turn."""
         if self.state != GameState.DRAWING or self.current_player_index != SEAT_HUMAN:
             return False
-        card = self.deck.peek_discard()
+        card = self.last_discard   # always 上家's card in normal turn flow
         if card is None:
             return False
-        self.deck.pick_discard()
+        self.deck.pick_discard()   # remove from pile for accounting
+        self.discard_history[self.last_discard_player.player_id].pop()
         self.last_discard        = None
         self.last_discard_player = None
         human = self.players[SEAT_HUMAN]
@@ -231,6 +234,7 @@ class Game:
         self.deck.reset()
         self.last_discard        = None
         self.last_discard_player = None
+        self.discard_history     = [[] for _ in range(NUM_PLAYERS)]
         self.winner              = None
         self.win_type            = None
         self.ron_discarder       = None
@@ -277,18 +281,19 @@ class Game:
         if self._ai_timer_ms > 0:
             return
 
-        # Deck empty check
-        discard_top = self.deck.peek_discard()
+        # AI may pick 上家's discard (last_discard) instead of drawing from deck
+        upjia_card = self.last_discard
         ai: AIPlayer = self.players[cp]  # type: ignore
 
         picked = False
-        if discard_top and ai.should_pick_discard(discard_top):
-            self.deck.pick_discard()
+        if upjia_card and ai.should_pick_discard(upjia_card):
+            self.deck.pick_discard()          # remove from pile for accounting
+            self.discard_history[self.last_discard_player.player_id].pop()
             self.last_discard        = None
             self.last_discard_player = None
-            ai.draw_card(discard_top)
+            ai.draw_card(upjia_card)
             self._drew_from_discard = True
-            self._log(f'{ai.name} 撿牌 {discard_top}')
+            self._log(f'{ai.name} 撿牌 {upjia_card}')
             picked = True
 
         if not picked:
@@ -351,6 +356,7 @@ class Game:
         self.deck.discard(card)
         self.last_discard        = card
         self.last_discard_player = player
+        self.discard_history[player.player_id].append(card)
         self._log(f'{player.name} 棄牌 {card}')
         self._set_state(GameState.DISCARDING)
 
@@ -505,11 +511,13 @@ class Game:
 
     @property
     def can_human_pick(self) -> bool:
-        return (
-            self.state == GameState.DRAWING
-            and self.is_human_turn
-            and self.last_discard is not None
-        )
+        if not (self.state == GameState.DRAWING and self.is_human_turn):
+            return False
+        if self.last_discard is None:
+            return False
+        # Only 上家's discard is eligible for pickup
+        upjia_idx = (SEAT_HUMAN - 1 + NUM_PLAYERS) % NUM_PLAYERS
+        return self.last_discard_player is self.players[upjia_idx]
 
     @property
     def can_human_draw(self) -> bool:
