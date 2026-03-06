@@ -3,13 +3,67 @@ Overlay dialogs: RON window, round-end result, game-over screen.
 These are drawn ON TOP of the main renderer.
 """
 from __future__ import annotations
+import re
 import pygame
 from constants import (
     WHITE, BLACK_COLOR, DARK_GRAY, LIGHT_GRAY,
     BTN_W, BTN_H,
     CENTER_X, CENTER_Y,
+    RED_COLOR,
 )
+from core.card import Suit as _Suit
+from gui.card_sprite import _suit as _draw_suit
 from gui.button import Button
+
+_SUIT_RE  = re.compile('([♠♣♥♦])')
+_SUIT_MAP = {
+    '♠': (_Suit.SPADES,   BLACK_COLOR),
+    '♣': (_Suit.CLUBS,    BLACK_COLOR),
+    '♥': (_Suit.HEARTS,   RED_COLOR),
+    '♦': (_Suit.DIAMONDS, RED_COLOR),
+}
+
+
+def _measure_text_with_suits(font: pygame.font.Font, text: str) -> int:
+    """Return the pixel width that _blit_text_with_suits would render."""
+    fh = font.get_height()
+    sz = max(4, fh // 4)
+    w = 0
+    for token in _SUIT_RE.split(text):
+        if not token:
+            continue
+        if token in _SUIT_MAP:
+            w += sz * 2 + 4
+        else:
+            w += font.size(token)[0]
+    return w
+
+
+def _blit_text_with_suits(
+    surface: pygame.Surface,
+    font: pygame.font.Font,
+    text: str,
+    x: int,
+    y: int,
+    color,
+) -> int:
+    """Render text, replacing suit symbols with small drawn graphics.
+    Returns the total width rendered."""
+    fh = font.get_height()
+    sz = max(4, fh // 4)
+    cx = x
+    for token in _SUIT_RE.split(text):
+        if not token:
+            continue
+        if token in _SUIT_MAP:
+            suit_enum, col = _SUIT_MAP[token]
+            _draw_suit(surface, suit_enum, cx + sz + 1, y + fh // 2, sz, col)
+            cx += sz * 2 + 4
+        else:
+            t = font.render(token, True, color)
+            surface.blit(t, (cx, y))
+            cx += t.get_width()
+    return cx - x
 
 
 # Semi-transparent overlay colour
@@ -63,10 +117,10 @@ class RonDialog:
         tx = self.rect.x + (self.rect.w - title.get_width()) // 2
         surface.blit(title, (tx, self.rect.y + 8))
 
-        # Card info
-        card_txt = self._font_md.render(f'對方棄牌：{discard_card_str}', True, WHITE)
-        cx2 = self.rect.x + (self.rect.w - card_txt.get_width()) // 2
-        surface.blit(card_txt, (cx2, self.rect.y + 44))
+        # Card info (suit symbols rendered as graphics to avoid font glyph gaps)
+        card_line = f'對方棄牌：{discard_card_str}'
+        cx2 = self.rect.x + (self.rect.w - _measure_text_with_suits(self._font_md, card_line)) // 2
+        _blit_text_with_suits(surface, self._font_md, card_line, cx2, self.rect.y + 44, WHITE)
 
         # Multi-Ron notice (shown when multiple claimants exist)
         if claimant_names and len(claimant_names) > 1:
