@@ -1,5 +1,5 @@
 """
-自摸勝 – main entry point.
+自摸 – main entry point.
 
 Run with:  python main.py
 """
