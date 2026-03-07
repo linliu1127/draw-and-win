@@ -16,7 +16,7 @@ def main() -> None:
     pygame.init()
 
     screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
-    pygame.display.set_caption('自摸')
+    pygame.display.set_caption('自摸·釣寶')
 
     menu     = Menu(screen)
     renderer = Renderer(screen)

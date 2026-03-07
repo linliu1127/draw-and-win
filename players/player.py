@@ -4,6 +4,23 @@ from core.card import Card
 from core.tenpai_checker import get_winning_cards, can_win_with
 
 
+def check_diaobao(hand4: list[Card]) -> bool:
+    """釣寶判斷：1鬼+3連張 或 2鬼+2張(差≤2)，且非鬼牌同色。"""
+    if len(hand4) != 4:
+        return False
+    ghosts  = [c for c in hand4 if c.is_ghost]
+    regular = [c for c in hand4 if not c.is_ghost]
+    if not regular or len({c.color for c in regular}) != 1:
+        return False
+    if len(ghosts) == 1 and len(regular) == 3:
+        ranks = sorted(c.rank for c in regular)
+        return ranks[1] == ranks[0] + 1 and ranks[2] == ranks[1] + 1
+    if len(ghosts) == 2 and len(regular) == 2:
+        ranks = sorted(c.rank for c in regular)
+        return ranks[1] - ranks[0] <= 2
+    return False
+
+
 class Player:
     """Base class for all players (human and AI)."""
 
@@ -63,6 +80,11 @@ class Player:
     def can_win_with(self, card: Card) -> bool:
         """True if this card completes the hand."""
         return can_win_with(self.hand.cards, card)
+
+    @property
+    def is_diaobao(self) -> bool:
+        """釣寶：1鬼+3連張 或 2鬼+2張(差≤2) 同色聽牌型。"""
+        return check_diaobao(self.hand.cards)
 
     # ------------------------------------------------------------------
     # Score

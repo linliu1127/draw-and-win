@@ -137,7 +137,9 @@ class Renderer:
         self.font_sm  = _load_font(FONT_SM)
         self.font_xsm = _load_font(FONT_XSM)
 
-        self._btn_win = Button(BTN_WIN_X, BTN_Y, BTN_W, BTN_H, '胡牌', style='ron', font=self.font_md)
+        self._btn_win = Button(BTN_WIN_X, BTN_Y, BTN_W, BTN_H, '自摸', style='ron', font=self.font_md)
+        self._font_md_bold = _load_font(FONT_MD)
+        self._font_md_bold.bold = True
 
         self._dlg_ron       = RonDialog(self.font_lg, self.font_md, self.font_sm)
         self._dlg_round_end = RoundEndDialog(self.font_lg, self.font_md, self.font_sm)
@@ -208,6 +210,12 @@ class Renderer:
         # ── Round label ────────────────────────────────────────────
         rl = self.font_sm.render(f'第 {game.round_number} 局', True, LIGHT_GRAY)
         surf.blit(rl, (WINDOW_WIDTH - rl.get_width() - 10, 8))
+
+        # ── 釣寶 indicator (left of 自摸 button) ───────────────────
+        if game.human.is_diaobao:
+            db = self._font_md_bold.render('釣寶中！', True, GOLD)
+            surf.blit(db, (BTN_WIN_X - db.get_width() - 10,
+                           BTN_Y + (BTN_H - db.get_height()) // 2))
 
         # ── Overlay dialogs ────────────────────────────────────────
         if game.state == GameState.RON_WINDOW and game.human_can_ron:

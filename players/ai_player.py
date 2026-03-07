@@ -49,7 +49,7 @@ class AIPlayer(Player):
         if not self.can_win_with(card):
             return False
         # Already in 釣寶: extremely broad winning condition → rarely ron
-        if self._is_diaobao(self.hand.cards):
+        if self.is_diaobao:
             return random.random() < 0.05
         # Not yet 釣寶 but picking up this card would enable it: decline ron
         if self._can_become_diaobao(self.hand.cards + [card]):
@@ -82,34 +82,11 @@ class AIPlayer(Player):
     # Internal helpers
     # ------------------------------------------------------------------
 
-    def _is_diaobao(self, hand4: list[Card]) -> bool:
-        """釣寶: wins with any card of a single color.
-
-        Two forms:
-        - 1 ghost + 3 same-color consecutive regular cards
-        - 2 ghosts + 2 same-color regular cards with rank gap ≤ 2
-          (gap ≤ 2 guarantees a ghost can fill the sequence and pair any draw)
-        """
-        ghosts  = [c for c in hand4 if c.is_ghost]
-        regular = [c for c in hand4 if not c.is_ghost]
-
-        if len({c.color for c in regular}) != 1:
-            return False
-
-        if len(ghosts) == 1 and len(regular) == 3:
-            ranks = sorted(c.rank for c in regular)
-            return ranks[1] == ranks[0] + 1 and ranks[2] == ranks[1] + 1
-
-        if len(ghosts) == 2 and len(regular) == 2:
-            ranks = sorted(c.rank for c in regular)
-            return ranks[1] - ranks[0] <= 2
-
-        return False
-
     def _can_become_diaobao(self, five_cards: list[Card]) -> bool:
         """Return True if discarding one card from five_cards leaves a 釣寶 hand."""
+        from players.player import check_diaobao
         for card in five_cards:
-            if self._is_diaobao([c for c in five_cards if c is not card]):
+            if check_diaobao([c for c in five_cards if c is not card]):
                 return True
         return False
 
