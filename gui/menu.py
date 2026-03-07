@@ -99,7 +99,7 @@ class Menu:
 
     def _draw_main(self, surf: pygame.Surface) -> None:
         # Hero title
-        hero = self._font_hero.render('自摸', True, GOLD)
+        hero = self._font_hero.render('自摸·釣寶', True, GOLD)
         surf.blit(hero, (CENTER_X - hero.get_width() // 2, 140))
 
         # Decorative gold rule under title
