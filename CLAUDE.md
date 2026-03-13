@@ -21,6 +21,11 @@ python -m pytest tests/test_win_checker.py::test_win_two_ghosts -v
 **Python path (Windows):** `C:/Users/User/AppData/Local/Programs/Python/Python312/python.exe`
 Use `dangerouslyDisableSandbox: true` on Bash calls that invoke Python.
 
+## Workflow
+
+- After every change, commit and push immediately without asking.
+- Commit messages: concise, imperative, Traditional Chinese (e.g. `修正 X`、`新增 Y`、`移除 Z`).
+
 ## Game Rules Summary
 
 - 4 players (1 human + 3 AI), each dealt 4 cards from a 54-card deck (52 regular + 2 ghost 魃)
