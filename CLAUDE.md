@@ -25,6 +25,9 @@ Use `dangerouslyDisableSandbox: true` on Bash calls that invoke Python.
 
 - After every change, commit and push immediately without asking.
 - Commit messages: concise, imperative, Traditional Chinese (e.g. `修正 X`、`新增 Y`、`移除 Z`).
+- After every change, also sync to the Hugo blog:
+  1. Rebuild: `python -m pygbag --build main.py`
+  2. Copy: `cp -r build/web/. /c/Users/Username/Desktop/program/Hugo/ghoti/static/games/draw-and-win/`
 
 ## Game Rules Summary
 
