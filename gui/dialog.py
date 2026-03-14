@@ -238,9 +238,9 @@ class GameOverDialog:
         w, h   = 500, 320
         self.rect = pygame.Rect(cx - w // 2, cy - h // 2, w, h)
 
-        _quit_w = 120
+        _quit_w = 200
         self.btn_quit = Button(cx - _quit_w // 2, self.rect.bottom - BTN_H - 14,
-                               _quit_w, BTN_H, '\u56de\u4e3b\u9078\u55ae', style='skip', font=font_md)
+                               _quit_w, BTN_H, '回主選單', style='skip', font=font_md)
 
     def draw(
         self,

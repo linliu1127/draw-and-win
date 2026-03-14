@@ -37,7 +37,7 @@ class Menu:
         self._font_hero = _load_font(88)   # huge title
         self._font_lg   = _load_font(32)
         self._font_md   = _load_font(22)
-        self._font_sm   = _load_font(17)
+        self._font_sm   = _load_font(20)
 
         # ── Main menu buttons ──────────────────────────────────────
         bx = CENTER_X - _BTN_W // 2
