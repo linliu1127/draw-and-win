@@ -1,3 +1,12 @@
 __pycache__/
 *.pyc
 *.pyo
+
+# Pygbag build artifacts
+build/version.txt
+build/web/draw-and-win.apk
+build/web/draw-and-win.tar.gz
+build/web/favicon.png
+build/web-cache/*.data
+build/web-cache/*.head
+build/web-cache/*.png
