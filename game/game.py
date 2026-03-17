@@ -15,6 +15,7 @@ from constants import (
     STARTING_SCORE, TSUMO_WIN_AMOUNT, RON_WIN_AMOUNT,
     AI_DRAW_DELAY, AI_DISCARD_DELAY, AI_RON_DELAY, RON_WINDOW_TIME,
     SEAT_HUMAN, DISCARD_MAX_H, DISCARD_MAX_V,
+    AI_WIN_DISPLAY_MS, SPEECH_BUBBLE_DUR, SPEECH_BUBBLE_PICK,
 )
 
 # Per-seat history cap: horizontal seats (0, 2) vs vertical seats (1, 3)
@@ -83,11 +84,22 @@ class Game:
         # Whether the deck ran empty → draw round
         self.is_draw_round: bool = False
 
+        # AI speech bubbles: {seat: {'text': str, 'card': Card|None, 'timer_ms': int}}
+        self.ai_speech: dict = {}
+        self._win_display_ms: int = 0
+
     # ==================================================================
     # Main update – called once per frame with delta-time in ms
     # ==================================================================
 
     def update(self, dt: int) -> None:
+        # Tick speech bubble timers
+        expired = [s for s, b in self.ai_speech.items() if b['timer_ms'] <= 0]
+        for s in expired:
+            del self.ai_speech[s]
+        for b in self.ai_speech.values():
+            b['timer_ms'] -= dt
+
         s = self.state
 
         if s == GameState.INIT:
@@ -112,10 +124,10 @@ class Game:
             self._update_ron_window(dt)
 
         elif s == GameState.WIN_TSUMO:
-            self._do_scoring()
+            self._update_win_display(dt)
 
         elif s == GameState.WIN_RON:
-            self._do_scoring()
+            self._update_win_display(dt)
 
         elif s == GameState.SCORING:
             self._set_state(GameState.ROUND_END)
@@ -249,6 +261,8 @@ class Game:
         self._ai_ron_queue       = []
         self.ron_claimants       = []
         self._drew_from_discard  = False
+        self.ai_speech           = {}
+        self._win_display_ms     = 0
 
         for p in self.players:
             p.clear_hand()
@@ -298,6 +312,8 @@ class Game:
             ai.draw_card(upjia_card)
             self._drew_from_discard = True
             self._log(f'{ai.name} 撿牌 {upjia_card}')
+            self.ai_speech.clear()
+            self.ai_speech[cp] = {'text': '撿', 'card': None, 'timer_ms': SPEECH_BUBBLE_PICK}
             picked = True
 
         if not picked:
@@ -338,6 +354,9 @@ class Game:
             self.win_type = 'tsumo'
             self._log(f'{ai.name} 自摸！')
             self._ai_phase = ''
+            self.ai_speech.clear()
+            self.ai_speech[cp] = {'text': '自摸', 'card': None, 'timer_ms': AI_WIN_DISPLAY_MS}
+            self._win_display_ms = AI_WIN_DISPLAY_MS
             self._set_state(GameState.WIN_TSUMO)
             return
 
@@ -347,6 +366,8 @@ class Game:
             card = ai.hand[0]
         ai.discard_card(card)
         self._ai_phase = ''
+        self.ai_speech.clear()
+        self.ai_speech[cp] = {'text': '出', 'card': card, 'timer_ms': SPEECH_BUBBLE_DUR}
         self._process_discard(ai, card)
 
     # ------------------------------------------------------------------
@@ -434,9 +455,23 @@ class Game:
             self.win_type     = 'ron'
             self.ron_discarder = self.last_discard_player
             self._log(f'{ai.name} 胡牌！（搶 {self.ron_discarder.name} 的牌）')
+            self.ai_speech.clear()
+            self.ai_speech[idx] = {'text': '夠', 'card': None, 'timer_ms': AI_WIN_DISPLAY_MS}
+            self._win_display_ms = AI_WIN_DISPLAY_MS
             self._set_state(GameState.WIN_RON)
         else:
             self._advance_turn()
+
+    # ------------------------------------------------------------------
+    # WIN display delay (AI winner shows bubble before scoring)
+    # ------------------------------------------------------------------
+
+    def _update_win_display(self, dt: int) -> None:
+        if self.winner and self.winner.player_id != SEAT_HUMAN:
+            self._win_display_ms -= dt
+            if self._win_display_ms > 0:
+                return
+        self._do_scoring()
 
     # ------------------------------------------------------------------
     # SCORING

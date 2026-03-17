@@ -49,6 +49,7 @@ from gui.layout import (
     SCORE_X, SCORE_Y, SCORE_LINE_H,
     LOG_X, LOG_Y, LOG_LINE_H,
     RON_OVERLAY_RECT,
+    SPEECH_BUBBLE_POS, SPEECH_BUBBLE_TAIL, SPEECH_BUBBLE_W, SPEECH_BUBBLE_H,
 )
 from gui.card_sprite import draw_card_face, draw_card_back, draw_ghost_face, _suit as _draw_suit
 from core.card import Suit as _Suit
@@ -165,6 +166,9 @@ class Renderer:
         self._draw_ai2(surf, game)    # top
         self._draw_ai1(surf, game)    # right
         self._draw_ai3(surf, game)    # left
+
+        # ── AI speech bubbles ──────────────────────────────────────
+        self._draw_ai_speech_bubbles(surf, game)
 
         # ── Scores (top-left) ──────────────────────────────────────
         self._draw_scores(surf, game)
@@ -480,6 +484,50 @@ class Renderer:
                         and state == GameState.PLAYER_DRAWN
                         and game.is_human_turn):
                     game.human.select_card(int(target[5:]))
+
+    def _draw_ai_speech_bubbles(self, surf: pygame.Surface, game) -> None:
+        for seat, bubble in list(game.ai_speech.items()):
+            cx, cy = SPEECH_BUBBLE_POS[seat]
+            self._draw_speech_bubble(surf, cx, cy,
+                                     bubble['text'], bubble.get('card'),
+                                     SPEECH_BUBBLE_TAIL[seat])
+
+    def _draw_speech_bubble(self, surf, cx, cy, text, card, tail) -> None:
+        BW, BH = SPEECH_BUBBLE_W, SPEECH_BUBBLE_H
+        rect = pygame.Rect(cx - BW // 2, cy - BH // 2, BW, BH)
+        TAIL_LEN = 10
+
+        if tail == 'up':
+            tip  = (cx, cy - BH // 2 - TAIL_LEN)
+            pts  = [(cx - 6, cy - BH // 2 + 2), (cx + 6, cy - BH // 2 + 2), tip]
+            edge = [pts[0], tip, pts[1]]
+        elif tail == 'right':
+            tip  = (cx + BW // 2 + TAIL_LEN, cy)
+            pts  = [(cx + BW // 2 - 2, cy - 6), (cx + BW // 2 - 2, cy + 6), tip]
+            edge = [pts[0], tip, pts[1]]
+        else:  # left
+            tip  = (cx - BW // 2 - TAIL_LEN, cy)
+            pts  = [(cx - BW // 2 + 2, cy - 6), (cx - BW // 2 + 2, cy + 6), tip]
+            edge = [pts[0], tip, pts[1]]
+
+        pygame.draw.polygon(surf, WHITE, pts)
+        pygame.draw.rect(surf, WHITE, rect, border_radius=8)
+        pygame.draw.rect(surf, (60, 60, 60), rect, 2, border_radius=8)
+        pygame.draw.lines(surf, (60, 60, 60), False, edge, 2)
+
+        text_y = cy - self.font_md.get_height() // 2
+
+        if card is not None:
+            ink = BLACK_COLOR if card.color.name == 'BLACK' else RED_COLOR
+            prefix = self.font_md.render(f'出 {card.rank_symbol}', True, (20, 20, 20))
+            px = cx - BW // 2 + 6
+            surf.blit(prefix, (px, text_y))
+            sx = px + prefix.get_width() + 4
+            sy = cy
+            _draw_suit(surf, card.suit, sx, sy, 8, ink)
+        else:
+            lbl = self.font_md.render(text, True, (20, 20, 20))
+            surf.blit(lbl, (cx - lbl.get_width() // 2, text_y))
 
     def _get_click_target(self, pos: tuple, game) -> str | None:
         """Return a stable string identifier for whatever was clicked, or None."""
