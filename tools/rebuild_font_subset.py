@@ -7,6 +7,10 @@
 會自動掃描所有 .py 原始碼，收集漢字與特殊符號，
 加上完整 ASCII 可列印字元，產生精簡字型並覆寫
 Iansui-Regular.ttf。
+
+SOURCE_FONT：完整字型（不 commit，需自行放置於專案根目錄）
+OUTPUT_FONT：subset 輸出（commit）
+若 SOURCE_FONT 不存在，fallback 使用 OUTPUT_FONT（功能受限）。
 """
 
 import os
@@ -16,6 +20,9 @@ import subprocess
 import tempfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+SOURCE_FONT = 'Iansui-Regular-full.ttf'   # 完整字型（不 commit）
+OUTPUT_FONT = 'Iansui-Regular.ttf'         # subset 輸出（commit）
 
 SCAN_DIRS = [
     'constants.py',
@@ -62,7 +69,14 @@ def collect_chars() -> set[int]:
 
 
 def main():
-    font_path = os.path.join(ROOT, 'Iansui-Regular.ttf')
+    source_path = os.path.join(ROOT, SOURCE_FONT)
+    output_path = os.path.join(ROOT, OUTPUT_FONT)
+    if os.path.exists(source_path):
+        font_path = source_path
+        print(f'使用完整字型：{SOURCE_FONT}')
+    else:
+        font_path = output_path
+        print(f'警告：找不到 {SOURCE_FONT}，fallback 使用 {OUTPUT_FONT}（可能已是 subset，結果不完整）')
     if not os.path.exists(font_path):
         print(f'找不到字型檔：{font_path}')
         sys.exit(1)
@@ -74,7 +88,7 @@ def main():
         f.write(unicodes_str)
         tmp_path = f.name
 
-    out_path = font_path.replace('.ttf', '_subset.ttf')
+    out_path = output_path.replace('.ttf', '_subset.ttf')
     try:
         subprocess.run(
             [
@@ -87,9 +101,9 @@ def main():
             ],
             check=True,
         )
-        os.replace(out_path, font_path)
-        size_kb = os.path.getsize(font_path) // 1024
-        print(f'完成：{font_path}  ({size_kb} KB，{len(codepoints)} 個字元)')
+        os.replace(out_path, output_path)
+        size_kb = os.path.getsize(output_path) // 1024
+        print(f'完成：{output_path}  ({size_kb} KB，{len(codepoints)} 個字元)')
     finally:
         os.unlink(tmp_path)
         if os.path.exists(out_path):

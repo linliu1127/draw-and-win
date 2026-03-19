@@ -5,6 +5,9 @@ __pycache__/
 # Claude Code local settings
 .claude/settings.local.json
 
+# 完整字型（不 commit，用於重建 subset）
+Iansui-Regular-full.ttf
+
 # Pygbag build artifacts
 build/version.txt
 build/web/draw-and-win.apk
