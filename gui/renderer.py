@@ -26,8 +26,6 @@ from constants import CENTER_Y
 
 # States where all hands are revealed
 _REVEAL_STATES = frozenset({
-    GameState.WIN_TSUMO,
-    GameState.WIN_RON,
     GameState.ROUND_END,
     GameState.GAME_OVER,
 })

@@ -356,7 +356,7 @@ class Game:
             self._ai_phase = ''
             self.ai_speech.clear()
             self.ai_speech[cp] = {'text': '自摸', 'card': None, 'timer_ms': AI_WIN_DISPLAY_MS}
-            self._win_display_ms = AI_WIN_DISPLAY_MS
+            self._win_display_ms = 100
             self._set_state(GameState.WIN_TSUMO)
             return
 
@@ -367,7 +367,7 @@ class Game:
         ai.discard_card(card)
         self._ai_phase = ''
         self.ai_speech.clear()
-        self.ai_speech[cp] = {'text': '出', 'card': card, 'timer_ms': SPEECH_BUBBLE_DUR}
+        self.ai_speech[cp] = {'text': '出 ', 'card': card, 'timer_ms': SPEECH_BUBBLE_DUR}
         self._process_discard(ai, card)
 
     # ------------------------------------------------------------------
@@ -457,7 +457,7 @@ class Game:
             self._log(f'{ai.name} 胡牌！（搶 {self.ron_discarder.name} 的牌）')
             self.ai_speech.clear()
             self.ai_speech[idx] = {'text': '夠', 'card': None, 'timer_ms': AI_WIN_DISPLAY_MS}
-            self._win_display_ms = AI_WIN_DISPLAY_MS
+            self._win_display_ms = 100
             self._set_state(GameState.WIN_RON)
         else:
             self._advance_turn()
