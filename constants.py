@@ -54,13 +54,13 @@ RON_WIN_AMOUNT    = 50
 
 # Timing (milliseconds)
 FPS              = 60
-AI_DRAW_DELAY    = 2000
-AI_DISCARD_DELAY = 2000
+AI_DRAW_DELAY    = 1500
+AI_DISCARD_DELAY = 1500
 AI_RON_DELAY     = 600
 RON_WINDOW_TIME  = 5000
 AI_WIN_DISPLAY_MS  = 1000   # 自摸/夠 顯示 1 秒後才結算
-SPEECH_BUBBLE_DUR  = 2500   # 出牌泡泡顯示時間
-SPEECH_BUBBLE_PICK = 2000   # 撿牌泡泡顯示時間
+SPEECH_BUBBLE_DUR  = 1500  # 出牌泡泡顯示時間
+SPEECH_BUBBLE_PICK = 1500   # 撿牌泡泡顯示時間
 
 # Font sizes
 FONT_LG  = 32
