@@ -234,7 +234,7 @@ class Renderer:
         # Count
         cnt = self.font_sm.render(str(game.deck.remaining), True, WHITE)
         surf.blit(cnt, (DECK_X + (CARD_W - cnt.get_width()) // 2, DECK_Y + CARD_H + 4))
-        lbl = self.font_xsm.render('牌庫', True, LIGHT_GRAY)
+        lbl = self.font_sm.render('牌庫', True, LIGHT_GRAY)
         surf.blit(lbl, (DECK_X + (CARD_W - lbl.get_width()) // 2, DECK_Y + CARD_H + 4 + cnt.get_height()))
 
     def _draw_discard_history(self, surf: pygame.Surface, game) -> None:
@@ -517,7 +517,7 @@ class Renderer:
 
         if card is not None:
             ink = BLACK_COLOR if card.color.name == 'BLACK' else RED_COLOR
-            prefix = self.font_md.render(f'出 {card.rank_symbol}', True, (20, 20, 20))
+            prefix = self.font_md.render(f'出{card.rank_symbol} ', True, (20, 20, 20))
             px = cx - BW // 2 + 6
             surf.blit(prefix, (px, text_y))
             sx = px + prefix.get_width() + 4
