@@ -46,7 +46,7 @@ def collect_chars() -> set[int]:
     codepoints.update(range(0x20, 0x7F))
 
     # 掃描 .py 原始碼
-    pattern = re.compile(r'[\u4e00-\u9fff\uf900-\ufaff\u3000-\u303f\uff00-\uffef\u2192\u00b7\u2014]')
+    pattern = re.compile(r'[\u4e00-\u9fff\uf900-\ufaff\u3000-\u303f\uff00-\uffef\u2500-\u27bf\u00b7]')
     for entry in SCAN_DIRS:
         path = os.path.join(ROOT, entry)
         if os.path.isfile(path):
