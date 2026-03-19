@@ -115,8 +115,11 @@ LOG_LINE_H = 18
 # RON window overlay (semi-transparent)
 RON_OVERLAY_RECT = (CENTER_X - 220, CENTER_Y - 70, 440, 140)
 
-# Speech bubble layout
-SPEECH_BUBBLE_POS  = {1: (1020, 400), 2: (600, 145), 3: (167, 400)}
-SPEECH_BUBBLE_TAIL = {1: 'right',     2: 'up',        3: 'left'}
+# Speech bubble layout – each bubble sits beside the player's name label.
+# AI2 (top):   bubble to the right of name; tail points left toward name.
+# AI1 (right): bubble to the left  of name; tail points right toward name.
+# AI3 (left):  bubble to the right of name; tail points left  toward name.
+SPEECH_BUBBLE_POS  = {1: (1030, 604), 2: (705, 135), 3: (165, 604)}
+SPEECH_BUBBLE_TAIL = {1: 'right',     2: 'left',     3: 'left'}
 SPEECH_BUBBLE_W = 116
 SPEECH_BUBBLE_H = 40
