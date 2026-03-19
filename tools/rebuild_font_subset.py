@@ -27,6 +27,7 @@ OUTPUT_FONT = 'Iansui-Regular.ttf'         # subset 輸出（commit）
 SCAN_DIRS = [
     'constants.py',
     'main.py',
+    'README.md',
     'game',
     'core',
     'gui',
