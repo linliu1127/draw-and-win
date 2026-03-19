@@ -21,7 +21,7 @@ python -m pytest tests/test_win_checker.py -v
 python -m pytest tests/test_win_checker.py::test_win_two_ghosts -v
 ```
 
-**Python path (Windows):** `C:/Users/User/AppData/Local/Programs/Python/Python312/python.exe`
+**Python path (Windows):** 請查各台電腦的 MEMORY.md（`PYTHON_PATH`）
 Use `dangerouslyDisableSandbox: true` on Bash calls that invoke Python.
 
 ## Workflow
