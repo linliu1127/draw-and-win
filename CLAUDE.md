@@ -11,6 +11,9 @@ python main.py
 # Run all tests
 python -m pytest tests/ -v
 
+# 重建字型 subset（新增遊戲文字後執行）
+python tools/rebuild_font_subset.py
+
 # Run a single test file
 python -m pytest tests/test_win_checker.py -v
 
