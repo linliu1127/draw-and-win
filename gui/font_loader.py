@@ -3,10 +3,10 @@ import sys
 import pygame
 
 _WIN_PATHS = [
-    'C:/Windows/Fonts/NotoSansTC-VF.ttf',
+    'Iansui-Regular.ttf',
     'C:/Windows/Fonts/kaiu.ttf',
 ]
-_WASM_PATHS = ['NotoSansTC-VF.ttf']
+_WASM_PATHS = ['Iansui-Regular.ttf']
 
 _cached: str | None = None
 
