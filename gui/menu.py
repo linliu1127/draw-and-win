@@ -6,6 +6,7 @@ Pages:
   'rules' – 7 頁翻頁式規則說明 (page 0–6)
 """
 from __future__ import annotations
+import math
 import pygame
 
 from constants import (
@@ -33,15 +34,15 @@ _RULES = [
     ("2. 胡牌條件",
      "湊齊 5 張同色牌（全黑 ♠♣ 或全紅 ♥♦），\n恰好包含【一對】＋【一順（連續3張）】。"),
     ("3. 摸牌與棄牌",
-     "輪到你時，從牌庫摸 1 張\n（或撿上家的棄牌，連點兩下）。\n手牌達 5 張後棄 1 張，換下家。"),
-    ("4. 搶牌胡",
+     "輪到你時，連點兩下牌庫摸 1 張牌或撿上家的棄牌。\n若不構成自摸就棄一張牌，換下家。"),
+    ("4. 胡",
      "任一玩家打出你聽的牌，\n可立即按「胡」鍵胡牌；\n也可放棄，等待自摸。"),
     ("5. 計分",
      "自摸：向每位玩家收 100 點（共 ＋300）。\n搶牌：向被胡牌者收 50 點（共 ＋50）。\n勝者先開下一局。"),
     ("6. 魃（鬼牌）",
-     "牌庫有 2 張魃，可替代目標顏色\n中的任意一張牌。\n一手最多含 2 張魃。"),
+     "牌庫有 2 張魃，可當成任意一張牌。。"),
     ("7. 結束條件",
-     "每人起始 1000 點。\n有玩家破產（點數 ≤ 0），\n或四人同意結束時遊戲結束。"),
+     "每人起始 1000 點。\n當有玩家破產，\n或四人同意結束時遊戲結束。"),
 ]
 
 # ── Illustration area (right half) ─────────────────────────────────────
@@ -265,61 +266,145 @@ class Menu:
         surf.blit(lp, ((px0 + px1) // 2 - lp.get_width() // 2, bkt_y + 4))
 
     def _illus_2(self, surf: pygame.Surface) -> None:
-        """摸牌與棄牌 — deck → hand → discard."""
-        cy = _ICY
+        """摸牌與棄牌 — mini game board: deck, human hand, AI3 discard, arrows."""
+        h_gap = 5
+        h_span = 5 * _MC_W + 4 * h_gap   # 195
+        hx0 = _ICX - h_span // 2          # 763
+        hy  = 600
 
-        # Deck
-        dx = 610
-        dy = cy - _MC_H // 2
-        self._mini_back(surf, dx, dy)
-        lbl = self._font_xs.render('牌庫', True, GOLD)
-        surf.blit(lbl, (dx + _MC_W // 2 - lbl.get_width() // 2, dy + _MC_H + 4))
+        # ── Deck (center-top) ──────────────────────────────────────────────
+        deck_x = _ICX - _MC_W // 2        # 843
+        deck_y = 310
+        # Shadow
+        self._mini_back(surf, deck_x - 3, deck_y - 3)
+        # Gold highlight (clickable hint)
+        pygame.draw.rect(surf, GOLD,
+                         (deck_x - 4, deck_y - 4, _MC_W + 8, _MC_H + 8),
+                         2, border_radius=_MC_R + 2)
+        self._mini_back(surf, deck_x, deck_y)
+        cnt = self._font_xs.render('46', True, WHITE)
+        surf.blit(cnt, (deck_x + _MC_W // 2 - cnt.get_width() // 2,
+                         deck_y + _MC_H + 2))
+        deck_lbl = self._font_xs.render('牌庫', True, GOLD)
+        surf.blit(deck_lbl, (deck_x + _MC_W // 2 - deck_lbl.get_width() // 2,
+                              deck_y + _MC_H + 14))
 
-        # Arrow 1
-        arrow = self._font_md.render('→', True, GOLD)
-        ax1 = dx + _MC_W + 8
-        surf.blit(arrow, (ax1, cy - arrow.get_height() // 2))
+        # ── Human hand (bottom) ────────────────────────────────────────────
+        hand_cards = [Card(Suit.SPADES, 3), Card(Suit.CLUBS, 7),
+                      Card(Suit.SPADES, 10), Card(Suit.CLUBS, 2),
+                      Card(Suit.SPADES, 5)]
+        turn_lbl = self._font_xs.render('▲ 你的回合', True, GOLD)
+        surf.blit(turn_lbl, (_ICX - turn_lbl.get_width() // 2,
+                              hy - turn_lbl.get_height() - 4))
+        for i, card in enumerate(hand_cards):
+            cx_i = hx0 + i * (_MC_W + h_gap)
+            if i == 4:  # Newly drawn card: gold highlight
+                pygame.draw.rect(surf, GOLD,
+                                 (cx_i - 4, hy - 4, _MC_W + 8, _MC_H + 8),
+                                 2, border_radius=_MC_R + 2)
+            self._mini_face(surf, card, cx_i, hy)
 
-        # 5 hand cards
-        hx = ax1 + arrow.get_width() + 8
-        hand = [Card(Suit.SPADES, 3), Card(Suit.CLUBS, 7),
-                Card(Suit.SPADES, 10), Card(Suit.CLUBS, 2),
-                Card(Suit.SPADES, 5)]
-        for i, card in enumerate(hand):
-            self._mini_face(surf, card, hx + i * (_MC_W + 3), cy - _MC_H // 2)
+        # ── AI3 left discard pile (landscape cards) ────────────────────────
+        ai3_discard = [Card(Suit.CLUBS, 8), Card(Suit.SPADES, 4)]
+        ai3_x = 623
+        ai3_cw, ai3_ch = _MC_H, _MC_W   # landscape: 50×35
+        ai3_gap = 8
+        ai3_y0 = 310
+        disc_lbl = self._font_xs.render('上家棄牌', True, GOLD)
+        surf.blit(disc_lbl, (ai3_x + ai3_cw // 2 - disc_lbl.get_width() // 2,
+                              ai3_y0 - disc_lbl.get_height() - 4))
+        for i, card in enumerate(ai3_discard):
+            cy_i = ai3_y0 + i * (ai3_ch + ai3_gap)
+            if i == 0:  # Top card highlighted
+                pygame.draw.rect(surf, GOLD,
+                                 (ai3_x - 4, cy_i - 4, ai3_cw + 8, ai3_ch + 8),
+                                 2, border_radius=_MC_R + 2)
+            rect = pygame.Rect(ai3_x, cy_i, ai3_cw, ai3_ch)
+            pygame.draw.rect(surf, CARD_FACE_BG, rect, border_radius=_MC_R)
+            pygame.draw.rect(surf, CARD_BORDER_COL, rect, 1, border_radius=_MC_R)
+            ink = BLACK_COLOR if card.color == Color.BLACK else RED_COLOR
+            txt = self._font_xs.render(
+                f"{card.rank_symbol}{card.suit_symbol}", True, ink)
+            surf.blit(txt, (ai3_x + 2, cy_i + 2))
 
-        # Arrow 2
-        ax2 = hx + 5 * (_MC_W + 3) + 5
-        surf.blit(arrow, (ax2, cy - arrow.get_height() // 2))
+        # ── Arrow 1: Deck → Hand (downward) ───────────────────────────────
+        a1_x  = _ICX
+        a1_y1 = deck_y + _MC_H + 32
+        a1_y2 = hy - 22
+        pygame.draw.line(surf, GOLD, (a1_x, a1_y1), (a1_x, a1_y2), 2)
+        pygame.draw.polygon(surf, GOLD, [
+            (a1_x,     a1_y2 + 7),
+            (a1_x - 5, a1_y2 - 1),
+            (a1_x + 5, a1_y2 - 1),
+        ])
+        a1_lbl = self._font_xs.render('摸牌', True, GOLD)
+        surf.blit(a1_lbl, (a1_x + 6, (a1_y1 + a1_y2) // 2 - a1_lbl.get_height() // 2))
 
-        # Discard
-        discx = ax2 + arrow.get_width() + 8
-        self._mini_face(surf, Card(Suit.SPADES, 3), discx, cy - _MC_H // 2)
-        lbl2 = self._font_xs.render('棄牌', True, WHITE)
-        surf.blit(lbl2, (discx + _MC_W // 2 - lbl2.get_width() // 2,
-                          cy + _MC_H // 2 + 4))
+        # ── Arrow 2: AI3 discard → Hand (diagonal) ────────────────────────
+        a2_x1 = ai3_x + ai3_cw + 4
+        a2_y1 = ai3_y0 + ai3_ch // 2
+        a2_x2 = hx0 - 6
+        a2_y2 = hy + _MC_H // 2
+        pygame.draw.line(surf, (150, 220, 150), (a2_x1, a2_y1), (a2_x2, a2_y2), 2)
+        ang = math.atan2(a2_y2 - a2_y1, a2_x2 - a2_x1)
+        ah = 8
+        pygame.draw.polygon(surf, (150, 220, 150), [
+            (int(a2_x2), int(a2_y2)),
+            (int(a2_x2 - ah * math.cos(ang - 0.5)),
+             int(a2_y2 - ah * math.sin(ang - 0.5))),
+            (int(a2_x2 - ah * math.cos(ang + 0.5)),
+             int(a2_y2 - ah * math.sin(ang + 0.5))),
+        ])
+        a2_lbl = self._font_xs.render('撿牌', True, (150, 220, 150))
+        surf.blit(a2_lbl, ((a2_x1 + a2_x2) // 2 - a2_lbl.get_width() // 2,
+                            (a2_y1 + a2_y2) // 2 - a2_lbl.get_height() - 4))
 
     def _illus_3(self, surf: pygame.Surface) -> None:
-        """搶牌胡 — opponent's discard + 胡 button."""
-        cx = _ICX
+        """搶牌胡 — 複製 RonDialog 外觀（靜態插圖）."""
+        panel_x, panel_y = 640, 291
+        panel_w, panel_h = 440, 178
+        pcx = panel_x + panel_w // 2   # 860
 
-        card_x = cx - CARD_W // 2
-        card_y = _ICY - CARD_H // 2 - 30
-        draw_card_face(surf, Card(Suit.CLUBS, 8), card_x, card_y,
-                       font_md=self._font_md, font_sm=self._font_sm)
+        # Semi-transparent dark-purple panel
+        panel_surf = pygame.Surface((panel_w, panel_h), pygame.SRCALPHA)
+        panel_surf.fill((30, 30, 50, 210))
+        surf.blit(panel_surf, (panel_x, panel_y))
+        pygame.draw.rect(surf, (120, 120, 180),
+                         (panel_x, panel_y, panel_w, panel_h), 2, border_radius=10)
 
-        lbl = self._font_sm.render('上家棄牌', True, WHITE)
-        surf.blit(lbl, (cx - lbl.get_width() // 2, card_y - lbl.get_height() - 8))
+        # Title "可以胡牌！" — gold
+        title = self._font_lg.render('可以胡牌！', True, (255, 220, 80))
+        surf.blit(title, (pcx - title.get_width() // 2, panel_y + 8))
 
-        # 胡 button mock-up (bottom-right of illus area)
-        bw, bh = 120, 50
-        bx = _IX1 - bw - 40
-        by = _IY1 - bh - 40
-        pygame.draw.rect(surf, (170, 40, 40), (bx, by, bw, bh), border_radius=8)
-        pygame.draw.rect(surf, GOLD, (bx, by, bw, bh), 2, border_radius=8)
-        bl = self._font_lg.render('胡', True, WHITE)
-        surf.blit(bl, (bx + bw // 2 - bl.get_width() // 2,
-                        by + bh // 2 - bl.get_height() // 2))
+        # Discard description "對方棄牌：♣8" — white
+        disc = self._font_md.render('對方棄牌：♣8', True, WHITE)
+        surf.blit(disc, (pcx - disc.get_width() // 2, panel_y + 44))
+
+        # Timer bar (static, ~60% progress)
+        bar_x = panel_x + 15
+        bar_y = panel_y + 96
+        bar_w = 410
+        pygame.draw.rect(surf, DARK_GRAY, (bar_x, bar_y, bar_w, 10))
+        pygame.draw.rect(surf, (80, 200, 80), (bar_x, bar_y, int(bar_w * 0.6), 10))
+
+        # Buttons
+        btn_y = panel_y + 130
+
+        # 胡牌 button (dark red)
+        hu_x = 765
+        pygame.draw.rect(surf, (170, 40, 40), (hu_x, btn_y, 80, 36), border_radius=6)
+        pygame.draw.rect(surf, BLACK_COLOR, (hu_x, btn_y, 80, 36), 1, border_radius=6)
+        hu_lbl = self._font_md.render('胡牌', True, WHITE)
+        surf.blit(hu_lbl, (hu_x + 40 - hu_lbl.get_width() // 2,
+                            btn_y + 18 - hu_lbl.get_height() // 2))
+
+        # 跳過 button (dark blue)
+        skip_x = 875
+        pygame.draw.rect(surf, (80, 80, 140), (skip_x, btn_y, 80, 36), border_radius=6)
+        pygame.draw.rect(surf, BLACK_COLOR, (skip_x, btn_y, 80, 36), 1, border_radius=6)
+        skip_lbl = self._font_md.render('跳過', True, WHITE)
+        surf.blit(skip_lbl, (skip_x + 40 - skip_lbl.get_width() // 2,
+                              btn_y + 18 - skip_lbl.get_height() // 2))
 
     def _illus_4(self, surf: pygame.Surface) -> None:
         """計分 — text-only scoring layout."""
@@ -327,7 +412,7 @@ class Menu:
         y = 120
 
         # 自摸 block
-        t = self._font_md.render('自摸勝利', True, GOLD)
+        t = self._font_md.render('自摸', True, GOLD)
         surf.blit(t, (x, y));  y += t.get_height() + 10
 
         for line, col in [('你          ＋300', GREEN_COLOR),
@@ -371,7 +456,7 @@ class Menu:
         draw_card_face(surf, Card(Suit.SPADES, 7), cx2, cy - CARD_H // 2,
                        font_md=self._font_md, font_sm=self._font_sm)
 
-        lbl = self._font_xs.render('任意同色牌', True, WHITE)
+        lbl = self._font_xs.render('任意牌', True, WHITE)
         surf.blit(lbl, (cx2 + CARD_W // 2 - lbl.get_width() // 2,
                          cy + CARD_H // 2 + 8))
 
