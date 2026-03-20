@@ -40,18 +40,18 @@ _RULES = [
     ("5. 計分",
      "自摸：向每位玩家收 100 點（共 ＋300）。\n搶牌：向被胡牌者收 50 點（共 ＋50）。\n勝者先開下一局。"),
     ("6. 魃（鬼牌）",
-     "牌庫有 2 張魃，可當成任意一張牌。。"),
+     "牌庫有 2 張魃，可當成任意一張牌。"),
     ("7. 結束條件",
      "每人起始 1000 點。\n當有玩家破產，\n或四人同意結束時遊戲結束。"),
 ]
 
-# ── Illustration area (right half) ─────────────────────────────────────
-_IX0 = 580   # left edge
-_IX1 = 1140  # right edge
-_IY0 = 80    # top edge
-_IY1 = 680   # bottom edge
-_ICX = (_IX0 + _IX1) // 2   # 860
-_ICY = (_IY0 + _IY1) // 2   # 380
+# ── Illustration area (bottom half) ────────────────────────────────────
+_IX0 = 40    # 插圖左邊界（margin）
+_IX1 = 1160  # 插圖右邊界
+_IY0 = 265   # 插圖上邊界（裝飾線下方）
+_IY1 = 714   # 插圖下邊界（按鈕上方）
+_ICX = 600   # CENTER_X（全寬中心）
+_ICY = (_IY0 + _IY1) // 2   # 489
 
 # Mini card dimensions (≈ 0.5 scale)
 _MC_W   = 35
@@ -145,19 +145,31 @@ class Menu:
         surf.blit(counter, (WINDOW_WIDTH - counter.get_width() - 50, 28))
 
         pygame.draw.line(surf, DARK_GRAY, (60, 68), (WINDOW_WIDTH - 60, 68), 1)
-        pygame.draw.line(surf, DARK_GRAY, (_IX0 - 20, 75), (_IX0 - 20, 700), 1)
 
-        # Left text
+        # Top text area
         t = self._font_lg.render(title_str, True, GOLD)
-        surf.blit(t, (40, 100))
+        surf.blit(t, (40, 80))
 
-        y = 160
+        y = 130
         for line in body_str.split('\n'):
             lt = self._font_sm.render(line, True, WHITE)
             surf.blit(lt, (40, y))
             y += self._font_sm.get_height() + 8
 
-        # Right illustration
+        # Gold decorative separator at y=250
+        deco_y = 250
+        pygame.draw.line(surf, GOLD, (80, deco_y), (CENTER_X - 12, deco_y), 1)
+        pygame.draw.line(surf, GOLD, (CENTER_X + 12, deco_y), (1120, deco_y), 1)
+        pygame.draw.polygon(surf, GOLD, [
+            (CENTER_X,      deco_y - 6),
+            (CENTER_X + 8,  deco_y),
+            (CENTER_X,      deco_y + 6),
+            (CENTER_X - 8,  deco_y),
+        ])
+        pygame.draw.circle(surf, GOLD, (80,   deco_y), 2)
+        pygame.draw.circle(surf, GOLD, (1120, deco_y), 2)
+
+        # Bottom illustration
         [self._illus_0, self._illus_1, self._illus_2,
          self._illus_3, self._illus_4, self._illus_5,
          self._illus_6][p](surf)
@@ -185,14 +197,14 @@ class Menu:
         x0_h = cx - cards_span // 2             # horizontal x-start for top/bottom
 
         # AI2 (top) — 4 card backs horizontal
-        ai2_y = 160
+        ai2_y = _IY0 + 30
         for i in range(4):
             self._mini_back(surf, x0_h + i * (_MC_W + _MC_GAP), ai2_y)
         lbl = self._font_xs.render('AI2', True, WHITE)
         surf.blit(lbl, (cx - lbl.get_width() // 2, ai2_y + _MC_H + 4))
 
         # Human (bottom) — 4 card faces horizontal
-        h_y = 560
+        h_y = _IY1 - _MC_H - 20
         human_cards = [Card(Suit.SPADES, 3), Card(Suit.CLUBS, 7),
                        Card(Suit.SPADES, 10), Card(Suit.CLUBS, 2)]
         for i, card in enumerate(human_cards):
@@ -205,7 +217,7 @@ class Menu:
         vy0 = cy - vert_span // 2
 
         # AI1 (right) — 4 rotated card backs, stacked vertically
-        ai1_x = 1060
+        ai1_x = _IX1 - _MC_H - 30
         for i in range(4):
             self._mini_back(surf, ai1_x, vy0 + i * (_MC_W + _MC_GAP),
                             w=_MC_H, h=_MC_W)
@@ -213,7 +225,7 @@ class Menu:
         surf.blit(lbl, (ai1_x + _MC_H + 4, cy - lbl.get_height() // 2))
 
         # AI3 (left) — 4 rotated card backs, stacked vertically
-        ai3_x = 608
+        ai3_x = _IX0 + 30
         for i in range(4):
             self._mini_back(surf, ai3_x, vy0 + i * (_MC_W + _MC_GAP),
                             w=_MC_H, h=_MC_W)
@@ -269,12 +281,12 @@ class Menu:
         """摸牌與棄牌 — mini game board: deck, human hand, AI3 discard, arrows."""
         h_gap = 5
         h_span = 5 * _MC_W + 4 * h_gap   # 195
-        hx0 = _ICX - h_span // 2          # 763
-        hy  = 600
+        hx0 = _ICX - h_span // 2
+        hy  = _IY1 - _MC_H - 20
 
         # ── Deck (center-top) ──────────────────────────────────────────────
-        deck_x = _ICX - _MC_W // 2        # 843
-        deck_y = 310
+        deck_x = _ICX - _MC_W // 2
+        deck_y = _ICY - 80
         # Shadow
         self._mini_back(surf, deck_x - 3, deck_y - 3)
         # Gold highlight (clickable hint)
@@ -313,8 +325,8 @@ class Menu:
             Card(Suit.CLUBS, 2),
             Card(Suit.SPADES, 4),   # most recent — the one that can be picked
         ]
-        ai3_x    = 625
-        ai3_y0   = 280
+        ai3_x    = _IX0 + 30
+        ai3_y0   = _ICY - 80
         ai3_step = 10   # 0.5× real _D_STEP=20
 
         disc_lbl = self._font_xs.render('上家棄牌', True, GOLD)
@@ -364,9 +376,9 @@ class Menu:
 
     def _illus_3(self, surf: pygame.Surface) -> None:
         """搶牌胡 — 複製 RonDialog 外觀（靜態插圖）."""
-        panel_x, panel_y = 640, 291
+        panel_x, panel_y = _ICX - 220, _ICY - 89
         panel_w, panel_h = 440, 178
-        pcx = panel_x + panel_w // 2   # 860
+        pcx = panel_x + panel_w // 2
 
         # Semi-transparent dark-purple panel
         panel_surf = pygame.Surface((panel_w, panel_h), pygame.SRCALPHA)
@@ -394,7 +406,7 @@ class Menu:
         btn_y = panel_y + 130
 
         # 胡牌 button (dark red)
-        hu_x = 765
+        hu_x = _ICX - 95
         pygame.draw.rect(surf, (170, 40, 40), (hu_x, btn_y, 80, 36), border_radius=6)
         pygame.draw.rect(surf, BLACK_COLOR, (hu_x, btn_y, 80, 36), 1, border_radius=6)
         hu_lbl = self._font_md.render('胡牌', True, WHITE)
@@ -402,7 +414,7 @@ class Menu:
                             btn_y + 18 - hu_lbl.get_height() // 2))
 
         # 跳過 button (dark blue)
-        skip_x = 875
+        skip_x = _ICX + 15
         pygame.draw.rect(surf, (80, 80, 140), (skip_x, btn_y, 80, 36), border_radius=6)
         pygame.draw.rect(surf, BLACK_COLOR, (skip_x, btn_y, 80, 36), 1, border_radius=6)
         skip_lbl = self._font_md.render('跳過', True, WHITE)
@@ -411,8 +423,8 @@ class Menu:
 
     def _illus_4(self, surf: pygame.Surface) -> None:
         """計分 — text-only scoring layout."""
-        x = _IX0 + 20
-        y = 120
+        x = _ICX - 220
+        y = _IY0 + 30
 
         # 自摸 block
         t = self._font_md.render('自摸', True, GOLD)
@@ -441,7 +453,7 @@ class Menu:
         cy = _ICY
 
         # Ghost card (full size)
-        gx = 700
+        gx = _ICX - 97
         gy = cy - CARD_H // 2
         draw_ghost_face(surf, gx, gy, font_md=self._font_md, font_sm=self._font_sm)
 
@@ -468,7 +480,7 @@ class Menu:
         bar_max_w = 440
         bar_h     = 36
         gap       = 28
-        x_lbl     = _IX0 + 20
+        x_lbl     = _ICX - 300
         x_bar     = x_lbl + 65
         total_h   = 4 * bar_h + 3 * gap
         y0        = _ICY - total_h // 2
