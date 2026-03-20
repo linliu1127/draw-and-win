@@ -90,23 +90,21 @@ class Menu:
     # Mini card helpers
     # ------------------------------------------------------------------
 
-    def _mini_back(self, surf: pygame.Surface, x: int, y: int,
-                   w: int = _MC_W, h: int = _MC_H) -> None:
-        rect = pygame.Rect(x, y, w, h)
-        pygame.draw.rect(surf, CARD_BACK_BG, rect, border_radius=_MC_R)
-        pygame.draw.rect(surf, CARD_BORDER_COL, rect, 1, border_radius=_MC_R)
-        for i in range(0, w, 6):
-            pygame.draw.line(surf, CARD_BACK_STRIPE, (x + i, y + 2), (x + i, y + h - 3), 1)
+    def _scaled_card_back(self, surf: pygame.Surface, x: int, y: int,
+                          w: int, h: int, rotated: bool = False) -> None:
+        """Render a real card back scaled to (w, h)."""
+        sw, sh = (CARD_H, CARD_W) if rotated else (CARD_W, CARD_H)
+        tmp = pygame.Surface((sw, sh), pygame.SRCALPHA)
+        draw_card_back(tmp, 0, 0, rotated=rotated)
+        surf.blit(pygame.transform.smoothscale(tmp, (w, h)), (x, y))
 
-    def _mini_face(self, surf: pygame.Surface, card: Card, x: int, y: int,
-                   w: int = _MC_W, h: int = _MC_H) -> None:
-        rect = pygame.Rect(x, y, w, h)
-        pygame.draw.rect(surf, CARD_FACE_BG, rect, border_radius=_MC_R)
-        pygame.draw.rect(surf, CARD_BORDER_COL, rect, 1, border_radius=_MC_R)
-        ink = BLACK_COLOR if card.color == Color.BLACK else RED_COLOR
-        label = f"{card.rank_symbol}{card.suit_symbol}"
-        txt = self._font_xs.render(label, True, ink)
-        surf.blit(txt, (x + 2, y + 2))
+    def _scaled_card_face(self, surf: pygame.Surface, card: Card,
+                          x: int, y: int, w: int, h: int) -> None:
+        """Render a real card face scaled to (w, h)."""
+        tmp = pygame.Surface((CARD_W, CARD_H), pygame.SRCALPHA)
+        draw_card_face(tmp, card, 0, 0,
+                       font_md=self._font_md, font_sm=self._font_sm)
+        surf.blit(pygame.transform.smoothscale(tmp, (w, h)), (x, y))
 
     # ------------------------------------------------------------------
     # Draw
@@ -200,7 +198,7 @@ class Menu:
         # AI2 (top) — 4 card backs horizontal
         ai2_y = _IY0 + 30
         for i in range(4):
-            self._mini_back(surf, x0_h + i * (cw + cg), ai2_y, w=cw, h=ch)
+            self._scaled_card_back(surf, x0_h + i * (cw + cg), ai2_y, cw, ch)
         lbl = self._font_xs.render('AI2', True, WHITE)
         surf.blit(lbl, (cx - lbl.get_width() // 2, ai2_y + ch + 4))
 
@@ -209,7 +207,7 @@ class Menu:
         human_cards = [Card(Suit.SPADES, 3), Card(Suit.CLUBS, 7),
                        Card(Suit.SPADES, 10), Card(Suit.CLUBS, 2)]
         for i, card in enumerate(human_cards):
-            self._mini_face(surf, card, x0_h + i * (cw + cg), h_y, w=cw, h=ch)
+            self._scaled_card_face(surf, card, x0_h + i * (cw + cg), h_y, cw, ch)
         lbl = self._font_xs.render('你', True, GOLD)
         surf.blit(lbl, (cx - lbl.get_width() // 2, h_y - lbl.get_height() - 4))
 
@@ -220,21 +218,21 @@ class Menu:
         # AI1 (right) — 4 rotated card backs, stacked vertically
         ai1_x = _IX1 - ch - 30
         for i in range(4):
-            self._mini_back(surf, ai1_x, vy0 + i * (cw + cg), w=ch, h=cw)
+            self._scaled_card_back(surf, ai1_x, vy0 + i * (cw + cg), ch, cw, rotated=True)
         lbl = self._font_xs.render('AI1', True, WHITE)
         surf.blit(lbl, (ai1_x + ch + 4, cy - lbl.get_height() // 2))
 
         # AI3 (left) — 4 rotated card backs, stacked vertically
         ai3_x = _IX0 + 30
         for i in range(4):
-            self._mini_back(surf, ai3_x, vy0 + i * (cw + cg), w=ch, h=cw)
+            self._scaled_card_back(surf, ai3_x, vy0 + i * (cw + cg), ch, cw, rotated=True)
         lbl = self._font_xs.render('AI3', True, WHITE)
         surf.blit(lbl, (ai3_x - lbl.get_width() - 4, cy - lbl.get_height() // 2))
 
         # Deck (center)
         deck_x = cx - cw // 2
         deck_y = cy - ch // 2
-        self._mini_back(surf, deck_x, deck_y, w=cw, h=ch)
+        self._scaled_card_back(surf, deck_x, deck_y, cw, ch)
         lbl = self._font_xs.render('牌庫', True, GOLD)
         surf.blit(lbl, (cx - lbl.get_width() // 2, deck_y + ch + 4))
 
@@ -287,12 +285,12 @@ class Menu:
         deck_x = _ICX - cw // 2
         deck_y = _ICY - 80
         # Shadow
-        self._mini_back(surf, deck_x - 3, deck_y - 3, w=cw, h=ch)
+        self._scaled_card_back(surf, deck_x - 3, deck_y - 3, cw, ch)
         # Gold highlight (clickable hint)
         pygame.draw.rect(surf, GOLD,
                          (deck_x - 4, deck_y - 4, cw + 8, ch + 8),
                          2, border_radius=_MC_R + 2)
-        self._mini_back(surf, deck_x, deck_y, w=cw, h=ch)
+        self._scaled_card_back(surf, deck_x, deck_y, cw, ch)
         cnt = self._font_xs.render('46', True, WHITE)
         surf.blit(cnt, (deck_x + cw // 2 - cnt.get_width() // 2,
                          deck_y + ch + 2))
@@ -313,7 +311,7 @@ class Menu:
                 pygame.draw.rect(surf, GOLD,
                                  (cx_i - 4, hy - 4, cw + 8, ch + 8),
                                  2, border_radius=_MC_R + 2)
-            self._mini_face(surf, card, cx_i, hy, w=cw, h=ch)
+            self._scaled_card_face(surf, card, cx_i, hy, cw, ch)
 
         # ── AI3 left discard pile (portrait, overlapping, vertical stack) ─
         # Mirrors real game: seat-3 pile starts at (215, _VY=320), step=(0,20).
@@ -332,14 +330,14 @@ class Menu:
         surf.blit(disc_lbl, (ai3_x + cw // 2 - disc_lbl.get_width() // 2,
                               ai3_y0 - disc_lbl.get_height() - 4))
         for i, card in enumerate(ai3_pile):
-            self._mini_face(surf, card, ai3_x, ai3_y0 + i * ai3_step, w=cw, h=ch)
+            self._scaled_card_face(surf, card, ai3_x, ai3_y0 + i * ai3_step, cw, ch)
 
         # Gold highlight on most-recent (bottom) card
         last_y = ai3_y0 + (len(ai3_pile) - 1) * ai3_step
         pygame.draw.rect(surf, GOLD,
                          (ai3_x - 4, last_y - 4, cw + 8, ch + 8),
                          2, border_radius=_MC_R + 2)
-        self._mini_face(surf, ai3_pile[-1], ai3_x, last_y, w=cw, h=ch)
+        self._scaled_card_face(surf, ai3_pile[-1], ai3_x, last_y, cw, ch)
 
         # ── Arrow 1: Deck → Hand (downward) ───────────────────────────────
         a1_x  = _ICX
@@ -434,8 +432,8 @@ class Menu:
                          (panel_x, panel_y, panel_w, panel_h), 2, border_radius=10)
 
         # Title
-        title = self._font_lg.render('玩家 自摸！', True, (255, 220, 80))
-        surf.blit(title, (_ICX - title.get_width() // 2, panel_y + 12))
+        # title = self._font_lg.render('玩家 自摸！', True, (255, 220, 80))
+        # surf.blit(title, (_ICX - title.get_width() // 2, panel_y + 12))
 
         x = panel_x + 40
         y = panel_y + 60
