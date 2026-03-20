@@ -422,9 +422,24 @@ class Menu:
                               btn_y + 18 - skip_lbl.get_height() // 2))
 
     def _illus_4(self, surf: pygame.Surface) -> None:
-        """計分 — text-only scoring layout."""
-        x = _ICX - 220
-        y = _IY0 + 30
+        """計分 — RoundEndDialog 風格面板 + 計分說明."""
+        panel_w, panel_h = 540, 280
+        panel_x = _ICX - panel_w // 2       # 330
+        panel_y = _ICY - panel_h // 2       # 349
+
+        # Panel background (same style as RoundEndDialog)
+        overlay = pygame.Surface((panel_w, panel_h), pygame.SRCALPHA)
+        overlay.fill((30, 30, 50, 210))
+        surf.blit(overlay, (panel_x, panel_y))
+        pygame.draw.rect(surf, (120, 120, 180),
+                         (panel_x, panel_y, panel_w, panel_h), 2, border_radius=10)
+
+        # Title
+        title = self._font_lg.render('玩家 自摸！', True, (255, 220, 80))
+        surf.blit(title, (_ICX - title.get_width() // 2, panel_y + 12))
+
+        x = panel_x + 40
+        y = panel_y + 60
 
         # 自摸 block
         t = self._font_md.render('自摸', True, GOLD)
@@ -434,10 +449,10 @@ class Menu:
                            ('其他三方各  −100', RED_COLOR)]:
             s = self._font_sm.render(line, True, col)
             surf.blit(s, (x + 20, y));  y += s.get_height() + 6
-        y += 20
+        y += 16
 
-        pygame.draw.line(surf, DARK_GRAY, (x, y), (x + 460, y), 1)
-        y += 20
+        pygame.draw.line(surf, DARK_GRAY, (x, y), (x + panel_w - 80, y), 1)
+        y += 16
 
         # 搶牌 block
         t = self._font_md.render('搶牌勝利', True, GOLD)
