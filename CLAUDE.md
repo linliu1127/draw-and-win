@@ -30,7 +30,8 @@ Use `dangerouslyDisableSandbox: true` on Bash calls that invoke Python.
 - Commit messages: concise, imperative, Traditional Chinese (e.g. `修正 X`、`新增 Y`、`移除 Z`).
 - After every change, also sync to the Hugo blog:
   1. Rebuild: `python -m pygbag --build --width 1200 --height 800 main.py`
-  2. Copy: `cp -r build/web/. <HUGO_BLOG_PATH>/static/games/draw-and-win/`
+  2. Patch: `python tools/patch_web.py`
+  3. Copy: `cp -r build/web/. <HUGO_BLOG_PATH>/static/games/draw-and-win/`
      （`HUGO_BLOG_PATH` 請查各台電腦的 MEMORY.md）
 
 ## Game Rules Summary
