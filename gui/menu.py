@@ -191,53 +191,52 @@ class Menu:
 
     def _illus_0(self, surf: pygame.Surface) -> None:
         """發牌 — mini game board: 4 players, each 4 cards."""
+        cw, ch, cg = 55, 80, 8   # larger mini-card for this page
         cx, cy = _ICX, _ICY
 
-        cards_span = 4 * _MC_W + 3 * _MC_GAP   # 155
-        x0_h = cx - cards_span // 2             # horizontal x-start for top/bottom
+        cards_span = 4 * cw + 3 * cg
+        x0_h = cx - cards_span // 2
 
         # AI2 (top) — 4 card backs horizontal
         ai2_y = _IY0 + 30
         for i in range(4):
-            self._mini_back(surf, x0_h + i * (_MC_W + _MC_GAP), ai2_y)
+            self._mini_back(surf, x0_h + i * (cw + cg), ai2_y, w=cw, h=ch)
         lbl = self._font_xs.render('AI2', True, WHITE)
-        surf.blit(lbl, (cx - lbl.get_width() // 2, ai2_y + _MC_H + 4))
+        surf.blit(lbl, (cx - lbl.get_width() // 2, ai2_y + ch + 4))
 
         # Human (bottom) — 4 card faces horizontal
-        h_y = _IY1 - _MC_H - 20
+        h_y = _IY1 - ch - 20
         human_cards = [Card(Suit.SPADES, 3), Card(Suit.CLUBS, 7),
                        Card(Suit.SPADES, 10), Card(Suit.CLUBS, 2)]
         for i, card in enumerate(human_cards):
-            self._mini_face(surf, card, x0_h + i * (_MC_W + _MC_GAP), h_y)
+            self._mini_face(surf, card, x0_h + i * (cw + cg), h_y, w=cw, h=ch)
         lbl = self._font_xs.render('你', True, GOLD)
         surf.blit(lbl, (cx - lbl.get_width() // 2, h_y - lbl.get_height() - 4))
 
-        # Rotated card stacks: w=_MC_H=50, h=_MC_W=35 (landscape)
-        vert_span = 4 * _MC_W + 3 * _MC_GAP    # 155
+        # Rotated card stacks: w=ch, h=cw (landscape)
+        vert_span = 4 * cw + 3 * cg
         vy0 = cy - vert_span // 2
 
         # AI1 (right) — 4 rotated card backs, stacked vertically
-        ai1_x = _IX1 - _MC_H - 30
+        ai1_x = _IX1 - ch - 30
         for i in range(4):
-            self._mini_back(surf, ai1_x, vy0 + i * (_MC_W + _MC_GAP),
-                            w=_MC_H, h=_MC_W)
+            self._mini_back(surf, ai1_x, vy0 + i * (cw + cg), w=ch, h=cw)
         lbl = self._font_xs.render('AI1', True, WHITE)
-        surf.blit(lbl, (ai1_x + _MC_H + 4, cy - lbl.get_height() // 2))
+        surf.blit(lbl, (ai1_x + ch + 4, cy - lbl.get_height() // 2))
 
         # AI3 (left) — 4 rotated card backs, stacked vertically
         ai3_x = _IX0 + 30
         for i in range(4):
-            self._mini_back(surf, ai3_x, vy0 + i * (_MC_W + _MC_GAP),
-                            w=_MC_H, h=_MC_W)
+            self._mini_back(surf, ai3_x, vy0 + i * (cw + cg), w=ch, h=cw)
         lbl = self._font_xs.render('AI3', True, WHITE)
         surf.blit(lbl, (ai3_x - lbl.get_width() - 4, cy - lbl.get_height() // 2))
 
         # Deck (center)
-        deck_x = cx - _MC_W // 2
-        deck_y = cy - _MC_H // 2
-        self._mini_back(surf, deck_x, deck_y)
+        deck_x = cx - cw // 2
+        deck_y = cy - ch // 2
+        self._mini_back(surf, deck_x, deck_y, w=cw, h=ch)
         lbl = self._font_xs.render('牌庫', True, GOLD)
-        surf.blit(lbl, (cx - lbl.get_width() // 2, deck_y + _MC_H + 4))
+        surf.blit(lbl, (cx - lbl.get_width() // 2, deck_y + ch + 4))
 
     def _illus_1(self, surf: pygame.Surface) -> None:
         """胡牌條件 — 5 cards with bracket labels."""
@@ -279,27 +278,27 @@ class Menu:
 
     def _illus_2(self, surf: pygame.Surface) -> None:
         """摸牌與棄牌 — mini game board: deck, human hand, AI3 discard, arrows."""
-        h_gap = 5
-        h_span = 5 * _MC_W + 4 * h_gap   # 195
+        cw, ch, cg = 55, 80, 8   # larger mini-card for this page
+        h_span = 5 * cw + 4 * cg
         hx0 = _ICX - h_span // 2
-        hy  = _IY1 - _MC_H - 20
+        hy  = _IY1 - ch - 20
 
         # ── Deck (center-top) ──────────────────────────────────────────────
-        deck_x = _ICX - _MC_W // 2
+        deck_x = _ICX - cw // 2
         deck_y = _ICY - 80
         # Shadow
-        self._mini_back(surf, deck_x - 3, deck_y - 3)
+        self._mini_back(surf, deck_x - 3, deck_y - 3, w=cw, h=ch)
         # Gold highlight (clickable hint)
         pygame.draw.rect(surf, GOLD,
-                         (deck_x - 4, deck_y - 4, _MC_W + 8, _MC_H + 8),
+                         (deck_x - 4, deck_y - 4, cw + 8, ch + 8),
                          2, border_radius=_MC_R + 2)
-        self._mini_back(surf, deck_x, deck_y)
+        self._mini_back(surf, deck_x, deck_y, w=cw, h=ch)
         cnt = self._font_xs.render('46', True, WHITE)
-        surf.blit(cnt, (deck_x + _MC_W // 2 - cnt.get_width() // 2,
-                         deck_y + _MC_H + 2))
+        surf.blit(cnt, (deck_x + cw // 2 - cnt.get_width() // 2,
+                         deck_y + ch + 2))
         deck_lbl = self._font_xs.render('牌庫', True, GOLD)
-        surf.blit(deck_lbl, (deck_x + _MC_W // 2 - deck_lbl.get_width() // 2,
-                              deck_y + _MC_H + 14))
+        surf.blit(deck_lbl, (deck_x + cw // 2 - deck_lbl.get_width() // 2,
+                              deck_y + ch + 14))
 
         # ── Human hand (bottom) ────────────────────────────────────────────
         hand_cards = [Card(Suit.SPADES, 3), Card(Suit.CLUBS, 7),
@@ -309,16 +308,16 @@ class Menu:
         surf.blit(turn_lbl, (_ICX - turn_lbl.get_width() // 2,
                               hy - turn_lbl.get_height() - 4))
         for i, card in enumerate(hand_cards):
-            cx_i = hx0 + i * (_MC_W + h_gap)
+            cx_i = hx0 + i * (cw + cg)
             if i == 4:  # Newly drawn card: gold highlight
                 pygame.draw.rect(surf, GOLD,
-                                 (cx_i - 4, hy - 4, _MC_W + 8, _MC_H + 8),
+                                 (cx_i - 4, hy - 4, cw + 8, ch + 8),
                                  2, border_radius=_MC_R + 2)
-            self._mini_face(surf, card, cx_i, hy)
+            self._mini_face(surf, card, cx_i, hy, w=cw, h=ch)
 
         # ── AI3 left discard pile (portrait, overlapping, vertical stack) ─
         # Mirrors real game: seat-3 pile starts at (215, _VY=320), step=(0,20).
-        # Here at 0.5× scale: step=10; most-recent card is at the BOTTOM = ♠4.
+        # Here at ~0.6× scale: step=12; most-recent card is at the BOTTOM = ♠4.
         ai3_pile = [
             Card(Suit.CLUBS, 9),
             Card(Suit.HEARTS, 6),
@@ -327,24 +326,24 @@ class Menu:
         ]
         ai3_x    = _IX0 + 30
         ai3_y0   = _ICY - 80
-        ai3_step = 10   # 0.5× real _D_STEP=20
+        ai3_step = 12
 
         disc_lbl = self._font_xs.render('上家棄牌', True, GOLD)
-        surf.blit(disc_lbl, (ai3_x + _MC_W // 2 - disc_lbl.get_width() // 2,
+        surf.blit(disc_lbl, (ai3_x + cw // 2 - disc_lbl.get_width() // 2,
                               ai3_y0 - disc_lbl.get_height() - 4))
         for i, card in enumerate(ai3_pile):
-            self._mini_face(surf, card, ai3_x, ai3_y0 + i * ai3_step)
+            self._mini_face(surf, card, ai3_x, ai3_y0 + i * ai3_step, w=cw, h=ch)
 
         # Gold highlight on most-recent (bottom) card
         last_y = ai3_y0 + (len(ai3_pile) - 1) * ai3_step
         pygame.draw.rect(surf, GOLD,
-                         (ai3_x - 4, last_y - 4, _MC_W + 8, _MC_H + 8),
+                         (ai3_x - 4, last_y - 4, cw + 8, ch + 8),
                          2, border_radius=_MC_R + 2)
-        self._mini_face(surf, ai3_pile[-1], ai3_x, last_y)
+        self._mini_face(surf, ai3_pile[-1], ai3_x, last_y, w=cw, h=ch)
 
         # ── Arrow 1: Deck → Hand (downward) ───────────────────────────────
         a1_x  = _ICX
-        a1_y1 = deck_y + _MC_H + 32
+        a1_y1 = deck_y + ch + 32
         a1_y2 = hy - 22
         pygame.draw.line(surf, GOLD, (a1_x, a1_y1), (a1_x, a1_y2), 2)
         pygame.draw.polygon(surf, GOLD, [
@@ -356,10 +355,10 @@ class Menu:
         surf.blit(a1_lbl, (a1_x + 6, (a1_y1 + a1_y2) // 2 - a1_lbl.get_height() // 2))
 
         # ── Arrow 2: AI3 discard (♠4, bottom) → Hand ─────────────────────
-        a2_x1 = ai3_x + _MC_W + 4
-        a2_y1 = last_y + _MC_H // 2
+        a2_x1 = ai3_x + cw + 4
+        a2_y1 = last_y + ch // 2
         a2_x2 = hx0 - 6
-        a2_y2 = hy + _MC_H // 2
+        a2_y2 = hy + ch // 2
         pygame.draw.line(surf, (150, 220, 150), (a2_x1, a2_y1), (a2_x2, a2_y2), 2)
         ang = math.atan2(a2_y2 - a2_y1, a2_x2 - a2_x1)
         ah = 8
@@ -423,7 +422,7 @@ class Menu:
 
     def _illus_4(self, surf: pygame.Surface) -> None:
         """計分 — RoundEndDialog 風格面板 + 計分說明."""
-        panel_w, panel_h = 540, 280
+        panel_w, panel_h = 540, 360
         panel_x = _ICX - panel_w // 2       # 330
         panel_y = _ICY - panel_h // 2       # 349
 
