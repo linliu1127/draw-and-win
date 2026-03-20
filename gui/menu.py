@@ -304,28 +304,31 @@ class Menu:
                                  2, border_radius=_MC_R + 2)
             self._mini_face(surf, card, cx_i, hy)
 
-        # ── AI3 left discard pile (landscape cards) ────────────────────────
-        ai3_discard = [Card(Suit.CLUBS, 8), Card(Suit.SPADES, 4)]
-        ai3_x = 623
-        ai3_cw, ai3_ch = _MC_H, _MC_W   # landscape: 50×35
-        ai3_gap = 8
-        ai3_y0 = 310
+        # ── AI3 left discard pile (portrait, overlapping, vertical stack) ─
+        # Mirrors real game: seat-3 pile starts at (215, _VY=320), step=(0,20).
+        # Here at 0.5× scale: step=10; most-recent card is at the BOTTOM = ♠4.
+        ai3_pile = [
+            Card(Suit.CLUBS, 9),
+            Card(Suit.HEARTS, 6),
+            Card(Suit.CLUBS, 2),
+            Card(Suit.SPADES, 4),   # most recent — the one that can be picked
+        ]
+        ai3_x    = 625
+        ai3_y0   = 280
+        ai3_step = 10   # 0.5× real _D_STEP=20
+
         disc_lbl = self._font_xs.render('上家棄牌', True, GOLD)
-        surf.blit(disc_lbl, (ai3_x + ai3_cw // 2 - disc_lbl.get_width() // 2,
+        surf.blit(disc_lbl, (ai3_x + _MC_W // 2 - disc_lbl.get_width() // 2,
                               ai3_y0 - disc_lbl.get_height() - 4))
-        for i, card in enumerate(ai3_discard):
-            cy_i = ai3_y0 + i * (ai3_ch + ai3_gap)
-            if i == 0:  # Top card highlighted
-                pygame.draw.rect(surf, GOLD,
-                                 (ai3_x - 4, cy_i - 4, ai3_cw + 8, ai3_ch + 8),
-                                 2, border_radius=_MC_R + 2)
-            rect = pygame.Rect(ai3_x, cy_i, ai3_cw, ai3_ch)
-            pygame.draw.rect(surf, CARD_FACE_BG, rect, border_radius=_MC_R)
-            pygame.draw.rect(surf, CARD_BORDER_COL, rect, 1, border_radius=_MC_R)
-            ink = BLACK_COLOR if card.color == Color.BLACK else RED_COLOR
-            txt = self._font_xs.render(
-                f"{card.rank_symbol}{card.suit_symbol}", True, ink)
-            surf.blit(txt, (ai3_x + 2, cy_i + 2))
+        for i, card in enumerate(ai3_pile):
+            self._mini_face(surf, card, ai3_x, ai3_y0 + i * ai3_step)
+
+        # Gold highlight on most-recent (bottom) card
+        last_y = ai3_y0 + (len(ai3_pile) - 1) * ai3_step
+        pygame.draw.rect(surf, GOLD,
+                         (ai3_x - 4, last_y - 4, _MC_W + 8, _MC_H + 8),
+                         2, border_radius=_MC_R + 2)
+        self._mini_face(surf, ai3_pile[-1], ai3_x, last_y)
 
         # ── Arrow 1: Deck → Hand (downward) ───────────────────────────────
         a1_x  = _ICX
@@ -340,9 +343,9 @@ class Menu:
         a1_lbl = self._font_xs.render('摸牌', True, GOLD)
         surf.blit(a1_lbl, (a1_x + 6, (a1_y1 + a1_y2) // 2 - a1_lbl.get_height() // 2))
 
-        # ── Arrow 2: AI3 discard → Hand (diagonal) ────────────────────────
-        a2_x1 = ai3_x + ai3_cw + 4
-        a2_y1 = ai3_y0 + ai3_ch // 2
+        # ── Arrow 2: AI3 discard (♠4, bottom) → Hand ─────────────────────
+        a2_x1 = ai3_x + _MC_W + 4
+        a2_y1 = last_y + _MC_H // 2
         a2_x2 = hx0 - 6
         a2_y2 = hy + _MC_H // 2
         pygame.draw.line(surf, (150, 220, 150), (a2_x1, a2_y1), (a2_x2, a2_y2), 2)
