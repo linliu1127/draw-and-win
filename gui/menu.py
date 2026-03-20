@@ -23,9 +23,9 @@ from gui.font_loader import load_font as _load_font
 from gui.card_sprite import draw_card_face, draw_card_back, draw_ghost_face
 from core.card import Card, Suit, Color
 
-_BTN_W   = 200
-_BTN_H   = 52
-_BTN_GAP = 16
+_BTN_W   = 220
+_BTN_H   = 60
+_BTN_GAP = 20
 
 # ── Rules data ─────────────────────────────────────────────────────────
 _RULES = [
@@ -48,16 +48,16 @@ _RULES = [
 # ── Illustration area (bottom half) ────────────────────────────────────
 _IX0 = 40    # 插圖左邊界（margin）
 _IX1 = 1160  # 插圖右邊界
-_IY0 = 265   # 插圖上邊界（裝飾線下方）
+_IY0 = 295   # 插圖上邊界（裝飾線下方）
 _IY1 = 714   # 插圖下邊界（按鈕上方）
 _ICX = 600   # CENTER_X（全寬中心）
 _ICY = (_IY0 + _IY1) // 2   # 489
 
 # Mini card dimensions (≈ 0.5 scale)
-_MC_W   = 35
-_MC_H   = 50
-_MC_GAP = 5
-_MC_R   = 4
+_MC_W   = 44
+_MC_H   = 64
+_MC_GAP = 7
+_MC_R   = 5
 
 
 class Menu:
@@ -67,15 +67,15 @@ class Menu:
         self._rule_page = 0        # 0–6
 
         # Fonts
-        self._font_hero = _load_font(88)
-        self._font_lg   = _load_font(32)
-        self._font_md   = _load_font(22)
-        self._font_sm   = _load_font(20)
-        self._font_xs   = _load_font(14)
+        self._font_hero = _load_font(104)
+        self._font_lg   = _load_font(38)
+        self._font_md   = _load_font(26)
+        self._font_sm   = _load_font(24)
+        self._font_xs   = _load_font(17)
 
         # ── Main menu buttons ──────────────────────────────────────
         bx = CENTER_X - _BTN_W // 2
-        by = 330
+        by = 370
         self._btn_start = Button(bx, by,                       _BTN_W, _BTN_H, '開始遊戲', font=self._font_md)
         self._btn_rules = Button(bx, by + (_BTN_H + _BTN_GAP), _BTN_W, _BTN_H, '規則說明', font=self._font_md)
 
@@ -124,9 +124,9 @@ class Menu:
 
     def _draw_main(self, surf: pygame.Surface) -> None:
         hero = self._font_hero.render('自摸·釣寶', True, GOLD)
-        surf.blit(hero, (CENTER_X - hero.get_width() // 2, 140))
+        surf.blit(hero, (CENTER_X - hero.get_width() // 2, 160))
 
-        rule_y = 140 + hero.get_height() + 10
+        rule_y = 160 + hero.get_height() + 12
         pygame.draw.line(surf, GOLD, (CENTER_X - 80, rule_y), (CENTER_X + 80, rule_y), 2)
         pygame.draw.circle(surf, GOLD, (CENTER_X, rule_y), 4)
 
@@ -156,8 +156,8 @@ class Menu:
             surf.blit(lt, (40, y))
             y += self._font_sm.get_height() + 8
 
-        # Gold decorative separator at y=250
-        deco_y = 250
+        # Gold decorative separator at y=285
+        deco_y = 285
         pygame.draw.line(surf, GOLD, (80, deco_y), (CENTER_X - 12, deco_y), 1)
         pygame.draw.line(surf, GOLD, (CENTER_X + 12, deco_y), (1120, deco_y), 1)
         pygame.draw.polygon(surf, GOLD, [
@@ -493,7 +493,7 @@ class Menu:
     def _illus_6(self, surf: pygame.Surface) -> None:
         """結束條件 — 4 score bars."""
         bar_max_w = 440
-        bar_h     = 36
+        bar_h     = 44
         gap       = 28
         x_lbl     = _ICX - 300
         x_bar     = x_lbl + 65
